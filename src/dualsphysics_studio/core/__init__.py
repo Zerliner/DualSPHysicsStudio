@@ -1,0 +1,47 @@
+"""Public core API for DualSPHysics Studio 1.0.0."""
+
+from .document import CaseDocument
+from .errors import (
+    BackupError,
+    CaseDocumentError,
+    GeometryEditError,
+    ReadOnlyGeometryError,
+    SourceLocationError,
+    UnsafeXmlError,
+    XmlSyntaxError,
+)
+from .models import (
+    BoundingBox,
+    Diagnostic,
+    DocumentFacts,
+    GeometryType,
+    MarkerKind,
+    NodeExplanation,
+    ObjectRole,
+    SaveResult,
+    SceneObject,
+    Severity,
+    Vec3,
+)
+
+__all__ = [
+    "BackupError",
+    "BoundingBox",
+    "CaseDocument",
+    "CaseDocumentError",
+    "Diagnostic",
+    "DocumentFacts",
+    "GeometryEditError",
+    "GeometryType",
+    "MarkerKind",
+    "NodeExplanation",
+    "ObjectRole",
+    "ReadOnlyGeometryError",
+    "SaveResult",
+    "SceneObject",
+    "Severity",
+    "SourceLocationError",
+    "UnsafeXmlError",
+    "Vec3",
+    "XmlSyntaxError",
+]

@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<case>
+    <casedef>
+        <constantsdef>
+            <!-- 中文注释必须原样保留 -->
+            <gravity x="0" y="0" z="-9.81" units_comment="m/s^2" />
+            <rhop0 value="1000" units_comment="kg/m^3" />
+            <hswl value="0" auto="true" />
+            <speedsystem value="4" auto="false" />
+            <coefsound value="20" />
+            <speedsound value="0" auto="true" />
+            <coefh value="1.0" />
+        </constantsdef>
+        <mkconfig boundcount="50" fluidcount="9" />
+        <geometry>
+            <definition dp="0.01" units_comment="metres (m)">
+                <pointmin x="-0.05" y="-0.05" z="-0.05" />
+                <pointmax x="1.65" y="0.30" z="0.90" />
+            </definition>
+            <commands>
+                <mainlist>
+                    <setshapemode>dp | bound</setshapemode>
+                    <setdrawmode mode="full" />
+
+                    <setmkfluid mk="0" />
+                    <drawprism mask="0">
+                        <point x="0.20" y="0.00" z="0.30" />
+                        <point x="1.60" y="0.00" z="0.30" />
+                        <point x="1.60" y="0.00" z="0.00" />
+                        <point x="0.65" y="0.00" z="0.00" />
+                        <point x="0.20" y="0.25" z="0.30" />
+                        <point x="1.60" y="0.25" z="0.30" />
+                        <point x="1.60" y="0.25" z="0.00" />
+                        <point x="0.65" y="0.25" z="0.00" />
+                    </drawprism>
+                    <shapeout file="Water" />
+
+                    <setmkbound mk="0" />
+                    <drawbox>
+                        <boxfill>bottom | left | right | front | back</boxfill>
+                        <point x="0" y="0" z="0" />
+                        <size x="1.60" y="0.25" z="0.80" />
+                    </drawbox>
+                    <shapeout file="Tank" />
+
+                    <setmkbound mk="1" />
+                    <drawprism mask="0">
+                        <point x="0.00" y="0.00" z="0.00" />
+                        <point x="0.00" y="0.00" z="0.45" />
+                        <point x="0.65" y="0.00" z="0.00" />
+                        <point x="0.00" y="0.25" z="0.00" />
+                        <point x="0.00" y="0.25" z="0.45" />
+                        <point x="0.65" y="0.25" z="0.00" />
+                    </drawprism>
+                    <shapeout file="FixedSlope" />
+
+                    <!-- 六个独立浮动刚体 -->
+                    <setmkbound mk="10" />
+                    <drawprism mask="0">
+                        <point x="0.04" y="0.03" z="0.42" /><point x="0.04" y="0.03" z="0.48" />
+                        <point x="0.09" y="0.03" z="0.48" /><point x="0.09" y="0.03" z="0.42" />
+                        <point x="0.04" y="0.11" z="0.42" /><point x="0.04" y="0.11" z="0.48" />
+                        <point x="0.09" y="0.11" z="0.48" /><point x="0.09" y="0.11" z="0.42" />
+                    </drawprism>
+                    <shapeout file="SlideBlock_mk10" />
+
+                    <setmkbound mk="11" />
+                    <drawprism mask="0">
+                        <point x="0.10" y="0.03" z="0.36" /><point x="0.10" y="0.03" z="0.42" />
+                        <point x="0.15" y="0.03" z="0.42" /><point x="0.15" y="0.03" z="0.36" />
+                        <point x="0.10" y="0.11" z="0.36" /><point x="0.10" y="0.11" z="0.42" />
+                        <point x="0.15" y="0.11" z="0.42" /><point x="0.15" y="0.11" z="0.36" />
+                    </drawprism>
+                    <shapeout file="SlideBlock_mk11" />
+
+                    <setmkbound mk="12" />
+                    <drawprism mask="0">
+                        <point x="0.16" y="0.03" z="0.30" /><point x="0.16" y="0.03" z="0.36" />
+                        <point x="0.21" y="0.03" z="0.36" /><point x="0.21" y="0.03" z="0.30" />
+                        <point x="0.16" y="0.11" z="0.30" /><point x="0.16" y="0.11" z="0.36" />
+                        <point x="0.21" y="0.11" z="0.36" /><point x="0.21" y="0.11" z="0.30" />
+                    </drawprism>
+                    <shapeout file="SlideBlock_mk12" />
+
+                    <setmkbound mk="13" />
+                    <drawprism mask="0">
+                        <point x="0.05" y="0.13" z="0.41" /><point x="0.05" y="0.13" z="0.47" />
+                        <point x="0.10" y="0.13" z="0.47" /><point x="0.10" y="0.13" z="0.41" />
+                        <point x="0.05" y="0.21" z="0.41" /><point x="0.05" y="0.21" z="0.47" />
+                        <point x="0.10" y="0.21" z="0.47" /><point x="0.10" y="0.21" z="0.41" />
+                    </drawprism>
+                    <shapeout file="SlideBlock_mk13" />
+
+                    <setmkbound mk="14" />
+                    <drawprism mask="0">
+                        <point x="0.11" y="0.13" z="0.35" /><point x="0.11" y="0.13" z="0.41" />
+                        <point x="0.16" y="0.13" z="0.41" /><point x="0.16" y="0.13" z="0.35" />
+                        <point x="0.11" y="0.21" z="0.35" /><point x="0.11" y="0.21" z="0.41" />
+                        <point x="0.16" y="0.21" z="0.41" /><point x="0.16" y="0.21" z="0.35" />
+                    </drawprism>
+                    <shapeout file="SlideBlock_mk14" />
+
+                    <setmkbound mk="15" />
+                    <drawprism mask="0">
+                        <point x="0.17" y="0.13" z="0.29" /><point x="0.17" y="0.13" z="0.35" />
+                        <point x="0.22" y="0.13" z="0.35" /><point x="0.22" y="0.13" z="0.29" />
+                        <point x="0.17" y="0.21" z="0.29" /><point x="0.17" y="0.21" z="0.35" />
+                        <point x="0.22" y="0.21" z="0.35" /><point x="0.22" y="0.21" z="0.29" />
+                    </drawprism>
+                    <shapeout file="SlideBlock_mk15" />
+                </mainlist>
+            </commands>
+        </geometry>
+        <floatings>
+            <floating mkbound="10" rhopbody="3000"><center x="0.065" y="0.07" z="0.45" /></floating>
+            <floating mkbound="11" rhopbody="3000"><center x="0.125" y="0.07" z="0.39" /></floating>
+            <floating mkbound="12" rhopbody="3000"><center x="0.185" y="0.07" z="0.33" /></floating>
+            <floating mkbound="13" rhopbody="3000"><center x="0.075" y="0.17" z="0.44" /></floating>
+            <floating mkbound="14" rhopbody="3000"><center x="0.135" y="0.17" z="0.38" /></floating>
+            <floating mkbound="15" rhopbody="3000"><center x="0.195" y="0.17" z="0.32" /></floating>
+        </floatings>
+    </casedef>
+    <execution>
+        <parameters>
+            <parameter key="StepAlgorithm" value="2" />
+            <parameter key="VerletSteps" value="40" />
+            <parameter key="Shifting" value="0" />
+            <parameter key="ShiftCoef" value="-2" />
+            <parameter key="ShiftTFS" value="0" />
+            <parameter key="TimeMax" value="3.0" units_comment="seconds" />
+            <parameter key="TimeOut" value="0.1" units_comment="seconds" />
+            <parameter key="PartsOutMax" value="1" />
+        </parameters>
+    </execution>
+</case>

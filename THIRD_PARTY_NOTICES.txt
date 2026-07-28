@@ -1,0 +1,108 @@
+THIRD-PARTY SOFTWARE NOTICES
+DualSPHysics Studio 1.0.0
+
+Copyright (c) 2026 Fang Li. The original DualSPHysics Studio source code is
+licensed under the MIT License in the separate `LICENSE` file.
+
+DualSPHysics Studio does not bundle DualSPHysics, GenCase, DualSPHysics CPU/GPU
+solvers, or PartVTK. DualSPHysics and related names belong to their respective
+owners. This application is an independent project and is not affiliated with,
+sponsored by, or endorsed by the DualSPHysics project or its development team.
+
+The Windows portable distribution contains these third-party runtime families.
+Copyright remains with each upstream author and contributor.
+
+  Component family                    Version(s)       License / terms
+  ----------------------------------  ---------------  ------------------------------
+  Python runtime                      3.13.x           PSF License; bundled notices
+  Qt / PySide6 / Shiboken             6.11.1           LGPL-3.0-only OR GPL options
+  VTK                                 9.6.2            BSD-3-Clause
+  OpenAI Python SDK                   2.45.0           Apache-2.0
+  Pydantic / pydantic-core            2.13.4/2.46.4    MIT
+  httpx / httpcore / h11              0.28.1/1.0.9     BSD-3-Clause / MIT
+  anyio / sniffio                     4.14.2/1.3.1     MIT / Apache-2.0 option
+  certifi                             2026.6.17        MPL-2.0
+  keyring and jaraco dependencies     25.7.0           MIT/BSD-style terms
+  distro                              1.9.0            Apache-2.0
+  jiter                               0.16.0           MIT
+  packaging                           26.2              Apache-2.0 OR BSD-2-Clause
+  typing extensions/inspection        4.16.0/0.4.2     PSF-2.0 / MIT
+  PyInstaller bootloader              6.21.0           GPL-2.0-or-later with exception
+  OpenSSL runtime                     3.x              Apache-2.0
+  Microsoft VC runtime                VC 14.x          Microsoft distributable terms
+
+The package intentionally omits Python `*.dist-info` installation metadata and
+combines all applicable license, COPYING, NOTICE, and AUTHORS texts into the
+single `THIRD_PARTY_LICENSES.txt` file. The folder names previously shown as
+`<component>-<version>` were license records, not Windows or GitHub certificates.
+
+`_internal/certifi/cacert.pem` is different: it is the CA trust store used to
+verify HTTPS servers for the optional OpenAI feature. It is a runtime data file,
+not an Authenticode signing certificate, and must remain in the package.
+
+QT COMMUNITY-LICENSE NOTICE
+
+Studio dynamically loads the Qt Core, GUI, Widgets, and SVG libraries from
+`_internal/PySide6`. Users may replace them with ABI-compatible modified builds;
+the portable directory applies no DRM or signature check to those libraries.
+Qt Virtual Keyboard, QML, Quick, PDF, Network, alternate platform backends, and
+unused image-format plugins are not shipped. In particular, the GPL-only Qt
+Virtual Keyboard module is excluded.
+
+The GNU GPLv3 and LGPLv3 texts and the applicable Qt and VTK third-party
+attributions are included below in the generated license appendix. The Qt
+attributions were verified against these unmodified source archives:
+
+  qtbase-everywhere-src-6.11.1.tar.xz
+  SHA-256 d9594a31228aa23ad6b531719a29b45f0f3989fe6c136d45767ea179f233c1ac
+
+  qtsvg-everywhere-src-6.11.1.tar.xz
+  SHA-256 7f3cf02f4824bf03c2c5859ea6db173bf1482a1daf24e6cdf7bc78cfa26a8a94
+
+  pyside-setup-everywhere-src-6.11.1.tar.xz
+  SHA-256 6ffd9835bb0dd2c56f061d62f1616bb1707cfc0202b80e3165d6be087f3965e2
+
+The VTK appendix includes module-specific Sandia/NVIDIA/U.S. Government terms,
+native third-party libraries, and statically compiled or header-only
+dependencies selected from the exact official source archive:
+
+  VTK-9.6.2.tar.gz
+  SHA-256 aed12cec12a9609179bf66329070266627ca64244a10856a452b2a17ffb04a1d
+
+The generated appendix uses the official CycloneDX SBOMs shipped in the
+pydantic-core and jiter wheels to identify their statically linked Rust crates.
+It records each crate name, version, source hash, author, and license expression,
+then reproduces the original crate notices. Byte-identical license bodies are
+stored once with every component association retained; the raw dependency-graph
+metadata and its upstream build paths are not copied into the portable package.
+
+Before a public binary release, the distributor must also place the exact
+corresponding Qt/PySide source archives at a distributor-controlled location
+beside the binary, or provide a valid written source offer. An upstream-only
+link is not sufficient under Qt's published community-license guidance. The
+final GitHub source-asset links or offer contact are therefore a release-time
+requirement and are not fabricated in this local build.
+
+The CPython runtime supplies `libssl-3.dll` and `libcrypto-3.dll`; the Apache
+License 2.0 text included in the Python acknowledgements and this appendix
+applies to that OpenSSL runtime. Python's license file also contains the terms
+for Microsoft distributable code, bzip2, libffi, and other bundled components.
+
+Extension tools placed in `DLC` are separate programs and are not included in
+the Studio distribution. Each extension is governed by the license and notices
+provided by its own distributor.
+
+Principal upstream references:
+
+  https://doc.qt.io/qt-6/licensing.html
+  https://doc.qt.io/qt-6/licenses-used-in-qt.html
+  https://www.qt.io/faq/qt-open-source-licensing
+  https://docs.python.org/3.13/license.html
+  https://vtk.org/about/
+  https://github.com/openai/openai-python
+  https://github.com/jaraco/keyring
+  https://github.com/pydantic/pydantic
+  https://www.pyinstaller.org/en/stable/license.html
+
+This notice is a practical redistribution record, not legal advice. The
+original license texts below control if a summary differs from them.

@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <defs>
+    <linearGradient id="background" x1="30" y1="24" x2="224" y2="234" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#176da6"/>
+      <stop offset="1" stop-color="#078b98"/>
+    </linearGradient>
+  </defs>
+  <rect x="8" y="8" width="240" height="240" rx="52" fill="url(#background)"/>
+
+  <!-- SPH is built from paths so the icon does not depend on an installed font. -->
+  <path transform="translate(-5.5 0)" d="M88 54H52C37 54 28 63 28 77c0 13 9 21 25 25l13 3c5 1 7 3 7 6 0 4-3 5-8 5H29v19h38c17 0 28-10 28-25 0-14-9-22-25-26l-13-3c-5-1-7-3-7-5 0-3 2-4 6-4h28z" fill="#ffffff"/>
+  <path transform="translate(1.5 0)" fill-rule="evenodd" d="M94 54h39c21 0 33 11 33 29s-12 29-33 29h-18v23H94zm21 20v18h17c8 0 13-3 13-9s-5-9-13-9z" fill="#ffffff"/>
+  <path transform="translate(-5.5 0)" d="M179 54h19v30h22V54h19v81h-19v-31h-22v31h-19z" fill="#ffffff"/>
+
+  <path d="M28 192c31-28 55-27 82-6 29 22 55 24 112-17" fill="none" stroke="#69d8f3" stroke-width="16" stroke-linecap="round"/>
+  <circle cx="58" cy="173" r="7" fill="#ffffff"/>
+  <circle cx="110" cy="186" r="7" fill="#ffffff"/>
+  <circle cx="172" cy="197" r="7" fill="#ffffff"/>
+  <circle cx="224" cy="34" r="11" fill="#ffad3d"/>
+</svg>

@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=83", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dualsphysics-studio"
+version = "1.0.0"
+description = "DualSPHysics v5.4 XML visual editor and local pipeline frontend"
+readme = "README.md"
+license = "MIT"
+authors = [{ name = "Fang Li" }]
+requires-python = ">=3.13,<3.14"
+dependencies = [
+  "PySide6==6.11.1",
+  "vtk==9.6.2",
+  "openai==2.45.0",
+  "keyring==25.7.0",
+  "pydantic==2.13.4",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest==9.1.1",
+  "pyinstaller==6.21.0",
+  "pyinstaller-hooks-contrib==2026.6",
+]
+
+[project.gui-scripts]
+dualsphysics-studio = "dualsphysics_studio.__main__:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+dualsphysics_studio = ["resources/*.json", "resources/*.qss", "resources/*.svg", "resources/*.ico"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+addopts = "-q"

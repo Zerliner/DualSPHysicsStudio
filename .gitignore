@@ -1,0 +1,31 @@
+# Python caches and local environments
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.venv/
+venv/
+
+# Build and release products
+/work/
+/outputs/
+/build/
+/dist/
+*.spec.bak
+
+# Local simulation products
+Case_out/
+*.bi4
+*.conversion.json
+
+# IDE and operating-system files
+.idea/
+.vscode/
+.agents/
+.codex/
+Thumbs.db
+Desktop.ini
+
+# Extensions are distributed separately; retain only the DLC instructions.
+/DLC/*
+!/DLC/README.txt

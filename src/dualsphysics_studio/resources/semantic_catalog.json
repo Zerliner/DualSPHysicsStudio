@@ -1,0 +1,114 @@
+{
+  "version": "5.4",
+  "entries": {
+    "gravity": {
+      "title": "重力加速度",
+      "description": "定义三维重力向量；常见水动力算例沿 z 轴负方向。",
+      "unit": "m/s²"
+    },
+    "rhop0": {
+      "title": "参考密度",
+      "description": "状态方程和粒子质量计算使用的流体参考密度。",
+      "unit": "kg/m³"
+    },
+    "rhopgradient": {
+      "title": "初始密度梯度",
+      "description": "控制初始流体密度的空间分布方式。",
+      "values": {"1": "统一为参考密度", "2": "按水柱深度", "3": "按最大水深"}
+    },
+    "hswl": {
+      "title": "最高静水面",
+      "description": "用于自动估算系统声速；auto=true 时 value=0 是占位值而非零水深。",
+      "unit": "m"
+    },
+    "gamma": {
+      "title": "多方指数",
+      "description": "弱可压缩水体状态方程使用的多方指数。"
+    },
+    "speedsystem": {
+      "title": "系统最大速度",
+      "description": "用于估算声速和稳定时间步；auto=true 时由 GenCase 估算。",
+      "unit": "m/s"
+    },
+    "coefsound": {
+      "title": "声速系数",
+      "description": "通常与系统速度相乘得到候选声速。"
+    },
+    "coefh": {
+      "title": "平滑长度系数",
+      "description": "三维常规分辨率下 h=coefh×sqrt(3×dp²)。"
+    },
+    "cflnumber": {
+      "title": "CFL 系数",
+      "description": "参与稳定时间步计算；减小通常更保守但计算量更大。"
+    },
+    "definition": {
+      "title": "几何离散定义",
+      "description": "dp 是初始粒子间距，pointmin/pointmax 定义 GenCase 建模范围。",
+      "unit": "m"
+    },
+    "drawbox": {
+      "title": "长方体绘制命令",
+      "description": "按 point 与 size/endpoint 生成长方体；boxfill 决定实体或选定表面。"
+    },
+    "drawprism": {
+      "title": "棱柱绘制命令",
+      "description": "前后两个对应截面的顶点必须保持数量和顺序一致；点序会影响表面方向。"
+    },
+    "floating": {
+      "title": "浮动刚体",
+      "description": "把指定 mkbound 声明为独立刚体；center 应与几何质心一致。",
+      "unit": "rhopbody: kg/m³"
+    },
+    "densitydepth": {
+      "title": "静水密度初始化",
+      "description": "按深度为指定流体 marker 初始化密度。"
+    },
+    "parameter:StepAlgorithm": {
+      "title": "时间积分算法",
+      "description": "选择求解器时间推进方法。",
+      "values": {"1": "Verlet", "2": "Symplectic"}
+    },
+    "parameter:Kernel": {
+      "title": "SPH 核函数",
+      "description": "选择粒子相互作用核函数。",
+      "values": {"1": "Cubic Spline", "2": "Wendland"}
+    },
+    "parameter:ViscoTreatment": {
+      "title": "黏性模型",
+      "description": "决定 Visco 参数采用的物理/数值含义。",
+      "values": {"1": "人工黏性", "2": "层流+SPS", "3": "层流"}
+    },
+    "parameter:DensityDT": {
+      "title": "密度扩散项",
+      "description": "用于抑制密度和压力噪声。",
+      "values": {"0": "关闭", "1": "Molteni", "2": "Fourtakas", "3": "Fourtakas full"}
+    },
+    "parameter:Shifting": {
+      "title": "粒子 Shifting",
+      "description": "改善粒子分布；值为 0 时 ShiftCoef 与 ShiftTFS 不生效。",
+      "values": {"0": "关闭", "1": "忽略边界", "2": "忽略固定边界", "3": "完整", "4": "高级"}
+    },
+    "parameter:RigidAlgorithm": {
+      "title": "刚体算法",
+      "description": "选择浮体/刚体的碰撞与动力学处理。",
+      "values": {"0": "无碰撞", "1": "SPH", "2": "DEM", "3": "Chrono"}
+    },
+    "parameter:TimeMax": {
+      "title": "模拟总时长",
+      "description": "求解器停止的物理时间。",
+      "unit": "s"
+    },
+    "parameter:TimeOut": {
+      "title": "结果输出间隔",
+      "description": "相邻粒子状态输出之间的物理时间。",
+      "unit": "s"
+    },
+    "parameter:PartsOutMax": {
+      "title": "允许排除粒子比例",
+      "description": "允许离开计算域的初始流体粒子比例。",
+      "warning": "该参数在 v5.4 官方模板中已标为弃用。"
+    }
+  }
+}
+

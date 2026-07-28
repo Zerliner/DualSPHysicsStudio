@@ -1,0 +1,14 @@
+QMainWindow, QDialog { background: #f5f7fa; color: #1d2733; }
+QToolBar { background: #ffffff; border-bottom: 1px solid #d8dee8; spacing: 5px; }
+QTreeView, QPlainTextEdit, QTextEdit, QTableWidget, QListWidget {
+  background: #ffffff; border: 1px solid #d8dee8; border-radius: 4px;
+  selection-background-color: #1769aa; selection-color: #ffffff;
+}
+QPushButton, QToolButton {
+  background: #ffffff; border: 1px solid #bdc7d6; border-radius: 4px; padding: 5px 10px;
+}
+QPushButton:hover, QToolButton:hover { background: #eaf3fb; border-color: #1769aa; }
+QPushButton:disabled, QToolButton:disabled { color: #9aa5b1; background: #edf0f4; }
+QTabWidget::pane { border: 1px solid #d8dee8; background: #ffffff; }
+QStatusBar { background: #ffffff; border-top: 1px solid #d8dee8; }
+
