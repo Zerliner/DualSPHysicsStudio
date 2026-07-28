@@ -37,7 +37,7 @@ def assert_vec_almost(testcase: unittest.TestCase, actual: Vec3, expected: Vec3)
 
 class CaseDocumentLoadTests(unittest.TestCase):
     def test_loads_nine_objects_and_six_floatings(self) -> None:
-        original = FIXTURE.read_text(encoding="utf-8")
+        original = FIXTURE.read_bytes().decode("utf-8")
         document = CaseDocument.from_file(FIXTURE)
 
         self.assertEqual(document.raw_text, original)
