@@ -71,6 +71,6 @@ DualSPHysics Studio-v1.0.0 (windows x64)\
 
 DualSPHysics Studio 自有源代码采用 MIT License。
 便携包中的 Qt for Python、VTK、Python 运行时和其他依赖仍分别遵循其上游许可证，
-发布构建会把 [THIRD_PARTY_NOTICES.txt](THIRD_PARTY_NOTICES.txt)、标准许可文本及各依赖的原始声明合并为一个 `THIRD_PARTY_LICENSES.txt`。公开发布 Qt/PySide 二进制前，还必须在发布者控制的位置提供对应源码或有效书面提供说明；最终 GitHub 地址确定后再补入发布资产。
+发布构建会把 [THIRD_PARTY_NOTICES.txt](THIRD_PARTY_NOTICES.txt)、标准许可文本及各依赖的原始声明合并为一个 `THIRD_PARTY_LICENSES.txt`。公开发布 Qt/PySide 二进制时，[GitHub Release](https://github.com/Zerliner/DualSPHysicsStudio/releases) 同时提供对应源码归档和 SHA-256 校验清单。
 
-GitHub 项目地址将在公开仓库建立后补充。
+GitHub 项目地址：https://github.com/Zerliner/DualSPHysicsStudio
