@@ -74,3 +74,5 @@ DualSPHysics Studio 自有源代码采用 MIT License。
 发布构建会把 [THIRD_PARTY_NOTICES.txt](THIRD_PARTY_NOTICES.txt)、标准许可文本及各依赖的原始声明合并为一个 `THIRD_PARTY_LICENSES.txt`。公开发布 Qt/PySide 二进制时，[GitHub Release](https://github.com/Zerliner/DualSPHysicsStudio/releases) 同时提供对应源码归档和 SHA-256 校验清单。
 
 GitHub 项目地址：https://github.com/Zerliner/DualSPHysicsStudio
+
+发布后的开发优先级与稳定性约束见 [ROADMAP.md](ROADMAP.md)。
