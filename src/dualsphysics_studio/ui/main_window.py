@@ -1,4 +1,4 @@
-"""Main PySide6 window for DualSPHysics Studio 1.0.0."""
+"""Main PySide6 window for DualSPHysics Studio 1.0.1."""
 
 from __future__ import annotations
 
@@ -8,14 +8,16 @@ from pathlib import Path
 from typing import Any, Callable
 
 from PySide6.QtCore import QPoint, QSignalBlocker, Qt, QTimer, Signal
-from PySide6.QtGui import QAction, QCloseEvent, QFontDatabase, QKeySequence
+from PySide6.QtGui import QAction, QCloseEvent, QFontDatabase, QKeySequence, QTextCursor
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QCheckBox,
+    QComboBox,
     QDialog,
     QFileDialog,
     QGroupBox,
     QHBoxLayout,
+    QHeaderView,
     QLabel,
     QLineEdit,
     QMainWindow,
@@ -36,6 +38,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ..core.mesh_guard import MeshPreflightError, inspect_mesh_file
 from ..extensions import (
     ExtensionToolError,
     default_dlc_directory,
@@ -45,8 +48,11 @@ from ..version import APP_VERSION
 from .models import (
     CATEGORY_LABELS,
     CATEGORY_ORDER,
+    DiagnosticRow,
     SceneTreeEntry,
     build_scene_entries,
+    diagnostic_counts,
+    diagnostic_rows,
     diagnostics_to_text,
     object_explanation,
     parse_editor_value,
@@ -70,6 +76,8 @@ VERSION = APP_VERSION
 TREE_KEY_ROLE = int(Qt.ItemDataRole.UserRole)
 PROPERTY_FIELD_ROLE = int(Qt.ItemDataRole.UserRole)
 PROPERTY_RAW_ROLE = int(Qt.ItemDataRole.UserRole) + 1
+DIAGNOSTIC_ROW_ROLE = int(Qt.ItemDataRole.UserRole) + 10
+PARAMETER_FIELD_ROLE = int(Qt.ItemDataRole.UserRole) + 20
 
 
 def _document_attribute(document: Any, *names: str, default: Any = None) -> Any:
@@ -133,6 +141,9 @@ class MainWindow(QMainWindow):
         self._selected_entry: SceneTreeEntry | None = None
         self._loading_source = False
         self._loading_properties = False
+        self._loading_parameters = False
+        self._diagnostic_rows: list[DiagnosticRow] = []
+        self._diagnostic_detail_dialog: QDialog | None = None
         self._dirty = False
         self._run_active = False
         self._extension_directory = default_dlc_directory()
@@ -520,7 +531,7 @@ class MainWindow(QMainWindow):
         self.inspector_tabs = QTabWidget(self)
         self.inspector_tabs.setObjectName("inspector_tabs")
         self.inspector_tabs.setMinimumWidth(285)
-        self.inspector_tabs.setMaximumWidth(480)
+        self.inspector_tabs.setMaximumWidth(580)
 
         property_page = QWidget(self.inspector_tabs)
         property_layout = QVBoxLayout(property_page)
@@ -558,13 +569,108 @@ class MainWindow(QMainWindow):
         self.explanation_view.setReadOnly(True)
         self.explanation_view.setPlaceholderText("选择模型或 XML 节点后显示离线解释。")
         explanation_layout.addWidget(self.explanation_view, 3)
-        diagnostics_label = QLabel("关联与参数诊断", explanation_page)
+        diagnostics_label = QLabel("诊断摘要（完整列表见“算例医生”）", explanation_page)
         diagnostics_label.setObjectName("diagnostics_label")
         explanation_layout.addWidget(diagnostics_label)
         self.diagnostics_view = QPlainTextEdit(explanation_page)
         self.diagnostics_view.setObjectName("diagnostics_view")
         self.diagnostics_view.setReadOnly(True)
         explanation_layout.addWidget(self.diagnostics_view, 2)
+
+        parameter_page = QWidget(self.inspector_tabs)
+        parameter_layout = QVBoxLayout(parameter_page)
+        parameter_layout.setContentsMargins(5, 5, 5, 5)
+        parameter_filter_row = QHBoxLayout()
+        self.parameter_search = QLineEdit(parameter_page)
+        self.parameter_search.setObjectName("parameter_search")
+        self.parameter_search.setPlaceholderText("搜索参数、说明或当前值")
+        parameter_filter_row.addWidget(self.parameter_search, 1)
+        self.parameter_category = QComboBox(parameter_page)
+        self.parameter_category.setObjectName("parameter_category")
+        for label, value in (
+            ("全部", "all"),
+            ("几何", "geometry"),
+            ("物理常量", "constants"),
+            ("执行参数", "execution"),
+        ):
+            self.parameter_category.addItem(label, value)
+        parameter_filter_row.addWidget(self.parameter_category)
+        parameter_layout.addLayout(parameter_filter_row)
+        self.parameter_table = QTableWidget(0, 5, parameter_page)
+        self.parameter_table.setObjectName("parameter_table")
+        self.parameter_table.setHorizontalHeaderLabels(
+            ["分类", "参数", "值", "单位", "状态"]
+        )
+        parameter_header = self.parameter_table.horizontalHeader()
+        for column in (0, 1, 3, 4):
+            parameter_header.setSectionResizeMode(
+                column, QHeaderView.ResizeMode.ResizeToContents
+            )
+        parameter_header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+        self.parameter_table.verticalHeader().setVisible(False)
+        self.parameter_table.setAlternatingRowColors(True)
+        self.parameter_table.setSelectionBehavior(
+            QAbstractItemView.SelectionBehavior.SelectRows
+        )
+        self.parameter_table.setSelectionMode(
+            QAbstractItemView.SelectionMode.SingleSelection
+        )
+        parameter_layout.addWidget(self.parameter_table, 3)
+        self.parameter_explanation = QPlainTextEdit(parameter_page)
+        self.parameter_explanation.setObjectName("parameter_explanation")
+        self.parameter_explanation.setReadOnly(True)
+        self.parameter_explanation.setMaximumHeight(155)
+        self.parameter_explanation.setPlaceholderText(
+            "选择参数后显示 v5.4 离线说明、单位和生效状态。"
+        )
+        parameter_layout.addWidget(self.parameter_explanation, 1)
+
+        doctor_page = QWidget(self.inspector_tabs)
+        doctor_layout = QVBoxLayout(doctor_page)
+        doctor_layout.setContentsMargins(5, 5, 5, 5)
+        self.doctor_summary = QLabel("尚未打开 XML", doctor_page)
+        self.doctor_summary.setObjectName("doctor_summary")
+        self.doctor_summary.setWordWrap(True)
+        doctor_layout.addWidget(self.doctor_summary)
+        doctor_toolbar = QHBoxLayout()
+        self.doctor_filter = QComboBox(doctor_page)
+        self.doctor_filter.setObjectName("doctor_filter")
+        for label, value in (
+            ("全部问题", "all"),
+            ("仅错误", "error"),
+            ("仅警告", "warning"),
+            ("仅建议", "info"),
+        ):
+            self.doctor_filter.addItem(label, value)
+        doctor_toolbar.addWidget(self.doctor_filter)
+        self.doctor_jump_button = QPushButton("跳转到 XML", doctor_page)
+        self.doctor_jump_button.setObjectName("doctor_jump_button")
+        doctor_toolbar.addWidget(self.doctor_jump_button)
+        doctor_layout.addLayout(doctor_toolbar)
+        self.doctor_quick_check_button = QPushButton("GenCase 快速检查", doctor_page)
+        self.doctor_quick_check_button.setObjectName("doctor_quick_check_button")
+        doctor_layout.addWidget(self.doctor_quick_check_button)
+        self.doctor_table = QTreeWidget(doctor_page)
+        self.doctor_table.setObjectName("doctor_table")
+        self.doctor_table.setHeaderLabels(["级别", "问题", "位置"])
+        self.doctor_table.setRootIsDecorated(False)
+        self.doctor_table.setAlternatingRowColors(True)
+        doctor_header = self.doctor_table.header()
+        doctor_header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+        doctor_header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        doctor_header.setSectionResizeMode(2, QHeaderView.ResizeMode.Interactive)
+        doctor_header.resizeSection(2, 120)
+        self.doctor_table.setSelectionMode(
+            QAbstractItemView.SelectionMode.SingleSelection
+        )
+        self.doctor_table.setUniformRowHeights(True)
+        doctor_layout.addWidget(self.doctor_table, 1)
+        doctor_hint = QLabel(
+            "双击级别或问题查看详情；双击位置或点击“跳转到 XML”可定位。",
+            doctor_page,
+        )
+        doctor_hint.setWordWrap(True)
+        doctor_layout.addWidget(doctor_hint)
 
         ai_page = QWidget(self.inspector_tabs)
         ai_layout = QVBoxLayout(ai_page)
@@ -603,6 +709,8 @@ class MainWindow(QMainWindow):
         ai_layout.addWidget(self.ai_result_view, 1)
 
         self.inspector_tabs.addTab(property_page, "属性")
+        self.inspector_tabs.addTab(parameter_page, "参数")
+        self.inspector_tabs.addTab(doctor_page, "算例医生")
         self.inspector_tabs.addTab(explanation_page, "离线解读")
         self.inspector_tabs.addTab(ai_page, "AI 解读")
 
@@ -687,6 +795,18 @@ class MainWindow(QMainWindow):
         self.viewport.stlLoadFailed.connect(self._stl_failed)
         self.source_editor.textChanged.connect(self._source_text_changed)
         self.property_table.itemChanged.connect(self._property_item_changed)
+        self.parameter_search.textChanged.connect(self._populate_parameters)
+        self.parameter_category.currentIndexChanged.connect(self._populate_parameters)
+        self.parameter_table.itemSelectionChanged.connect(
+            self._parameter_selection_changed
+        )
+        self.parameter_table.itemChanged.connect(self._parameter_item_changed)
+        self.doctor_filter.currentIndexChanged.connect(self._populate_doctor)
+        self.doctor_table.itemDoubleClicked.connect(
+            self._doctor_item_double_clicked
+        )
+        self.doctor_jump_button.clicked.connect(self._jump_to_selected_diagnostic)
+        self.doctor_quick_check_button.clicked.connect(self._request_quick_check)
         self.ai_consent_check.toggled.connect(self.ai_send_button.setEnabled)
         self.ai_preview_button.clicked.connect(self._preview_ai_payload)
         self.ai_send_button.clicked.connect(self._request_ai_explanation)
@@ -795,7 +915,8 @@ class MainWindow(QMainWindow):
         self.viewport.set_definition_bounds(definition_bounds)
 
         diagnostics = _document_attribute(self._document, "diagnostics", "issues", default=())
-        self.diagnostics_view.setPlainText(diagnostics_to_text(diagnostics))
+        self._set_diagnostics(diagnostics)
+        self._populate_parameters()
 
         if selected_key and selected_key in self._entry_by_key:
             self.select_object(selected_key)
@@ -927,7 +1048,8 @@ class MainWindow(QMainWindow):
                     diagnostics = _document_attribute(
                         self._document, "diagnostics", "issues", default=()
                     )
-                    self.diagnostics_view.setPlainText(diagnostics_to_text(diagnostics))
+                    self._set_diagnostics(diagnostics)
+                    self._populate_parameters()
                     if strict:
                         self._report_error("无法保存无效 XML", "请先修正源码中的 XML 语法错误。")
                     return False
@@ -1062,6 +1184,415 @@ class MainWindow(QMainWindow):
             self.property_table.resizeColumnToContents(0)
         finally:
             self._loading_properties = False
+
+    def _set_diagnostics(self, diagnostics: Any) -> None:
+        values = tuple(diagnostics or ())
+        self.diagnostics_view.setPlainText(diagnostics_to_text(values))
+        self._diagnostic_rows = diagnostic_rows(values)
+        self._populate_doctor()
+
+    def _populate_doctor(self, *_args: Any) -> None:
+        if not hasattr(self, "doctor_table"):
+            return
+        self.doctor_table.clear()
+        counts = diagnostic_counts(self._diagnostic_rows)
+        if self._document is None:
+            self.doctor_summary.setText("尚未打开 XML")
+        elif not self._diagnostic_rows:
+            self.doctor_summary.setText("未发现需要注意的问题，可以继续执行 GenCase 快速检查。")
+        else:
+            self.doctor_summary.setText(
+                f"错误 {counts['error']} · 警告 {counts['warning']} · "
+                f"建议 {counts['info']}"
+            )
+        selected_filter = self.doctor_filter.currentData() or "all"
+        for row in self._diagnostic_rows:
+            if selected_filter != "all" and row.severity != selected_filter:
+                continue
+            if row.path and row.line is not None:
+                location = f"{row.path} · 第 {row.line} 行"
+            elif row.path:
+                location = row.path
+            elif row.line is not None:
+                location = f"第 {row.line} 行"
+            else:
+                location = "—"
+            item = QTreeWidgetItem(
+                self.doctor_table,
+                [row.severity_label, row.message, location],
+            )
+            item.setData(0, DIAGNOSTIC_ROW_ROLE, row)
+            item.setToolTip(
+                1,
+                f"{row.code}\n{row.message}" if row.code else row.message,
+            )
+            item.setToolTip(2, location)
+        has_rows = self.doctor_table.topLevelItemCount() > 0
+        self.doctor_jump_button.setEnabled(has_rows)
+        self.doctor_quick_check_button.setEnabled(
+            self._document is not None and not self._run_active
+        )
+        if has_rows:
+            self.doctor_table.setCurrentItem(self.doctor_table.topLevelItem(0))
+
+    def _doctor_item_double_clicked(
+        self, item: QTreeWidgetItem, column: int
+    ) -> None:
+        self.doctor_table.setCurrentItem(item)
+        if column == 2:
+            self._jump_to_selected_diagnostic()
+            return
+        self._open_selected_diagnostic_detail()
+
+    def _open_selected_diagnostic_detail(self) -> None:
+        item = self.doctor_table.currentItem()
+        row = item.data(0, DIAGNOSTIC_ROW_ROLE) if item is not None else None
+        if not isinstance(row, DiagnosticRow):
+            self.status_message.setText("请先选择一个诊断问题")
+            return
+
+        if self._diagnostic_detail_dialog is not None:
+            self._diagnostic_detail_dialog.close()
+
+        dialog = QDialog(self)
+        dialog.setObjectName("diagnostic_detail_dialog")
+        dialog.setWindowTitle("算例医生 · 诊断详情")
+        dialog.setModal(False)
+        dialog.resize(700, 540)
+        layout = QVBoxLayout(dialog)
+        layout.setContentsMargins(14, 14, 14, 14)
+
+        heading = QLabel(
+            f"{row.severity_label} · {row.code or '未提供诊断代码'}",
+            dialog,
+        )
+        heading.setObjectName("diagnostic_detail_heading")
+        heading.setStyleSheet("font-size: 15px; font-weight: 600;")
+        layout.addWidget(heading)
+
+        layout.addWidget(QLabel("具体问题", dialog))
+        message_view = QPlainTextEdit(dialog)
+        message_view.setObjectName("diagnostic_detail_message")
+        message_view.setReadOnly(True)
+        message_view.setPlainText(row.message)
+        message_view.setMinimumHeight(105)
+        layout.addWidget(message_view, 1)
+
+        layout.addWidget(QLabel("XML 位置", dialog))
+        location_view = QPlainTextEdit(dialog)
+        location_view.setObjectName("diagnostic_detail_location")
+        location_view.setReadOnly(True)
+        location_view.setPlainText(self._diagnostic_location_text(row))
+        location_view.setMaximumHeight(90)
+        layout.addWidget(location_view)
+
+        layout.addWidget(QLabel("源码上下文", dialog))
+        source_view = QPlainTextEdit(dialog)
+        source_view.setObjectName("diagnostic_detail_source")
+        source_view.setReadOnly(True)
+        source_view.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
+        source_view.setPlainText(
+            self._diagnostic_source_context(row)
+            or "该诊断没有可显示的源码上下文。"
+        )
+        layout.addWidget(source_view, 2)
+
+        button_row = QHBoxLayout()
+        button_row.addStretch(1)
+        jump_button = QPushButton("跳转到 XML", dialog)
+        jump_button.setObjectName("diagnostic_detail_jump_button")
+        jump_button.setEnabled(self._diagnostic_line(row) is not None)
+        jump_button.clicked.connect(
+            lambda _checked=False: self._jump_to_diagnostic(row)
+        )
+        button_row.addWidget(jump_button)
+        close_button = QPushButton("关闭", dialog)
+        close_button.setObjectName("diagnostic_detail_close_button")
+        close_button.clicked.connect(dialog.close)
+        button_row.addWidget(close_button)
+        layout.addLayout(button_row)
+
+        self._diagnostic_detail_dialog = dialog
+        dialog.finished.connect(
+            lambda _result, current=dialog: self._diagnostic_detail_closed(current)
+        )
+        dialog.show()
+        dialog.raise_()
+        dialog.activateWindow()
+
+    def _diagnostic_detail_closed(self, dialog: QDialog) -> None:
+        if self._diagnostic_detail_dialog is dialog:
+            self._diagnostic_detail_dialog = None
+        dialog.deleteLater()
+
+    def _diagnostic_line(self, row: DiagnosticRow) -> int | None:
+        line = row.line
+        if line is None and row.path and self._document is not None:
+            method = getattr(self._document, "source_line", None)
+            if callable(method):
+                try:
+                    line = int(method(row.path))
+                except Exception:
+                    line = None
+        return line if line is not None and line > 0 else None
+
+    def _diagnostic_location_text(self, row: DiagnosticRow) -> str:
+        line = self._diagnostic_line(row)
+        parts = []
+        if row.path:
+            parts.append(f"XML 路径：{row.path}")
+        if line is not None:
+            parts.append(f"源码行号：第 {line} 行")
+        return "\n".join(parts) or "该诊断没有可定位的 XML 位置。"
+
+    def _diagnostic_source_context(
+        self, row: DiagnosticRow, radius: int = 2
+    ) -> str:
+        line = self._diagnostic_line(row)
+        source_lines = self.source_editor.toPlainText().splitlines()
+        if line is None or not source_lines or line > len(source_lines):
+            return ""
+        start = max(1, line - radius)
+        end = min(len(source_lines), line + radius)
+        width = len(str(end))
+        return "\n".join(
+            f"{'→' if number == line else ' '} {number:>{width}} │ "
+            f"{source_lines[number - 1]}"
+            for number in range(start, end + 1)
+        )
+
+    def _jump_to_selected_diagnostic(self) -> None:
+        item = self.doctor_table.currentItem()
+        row = item.data(0, DIAGNOSTIC_ROW_ROLE) if item is not None else None
+        if not isinstance(row, DiagnosticRow):
+            self.status_message.setText("请先选择一个诊断问题")
+            return
+        self._jump_to_diagnostic(row)
+
+    def _jump_to_diagnostic(self, row: DiagnosticRow) -> None:
+        line = self._diagnostic_line(row)
+        if line is None:
+            self.status_message.setText("该问题没有可定位的源码行")
+            return
+        block = self.source_editor.document().findBlockByNumber(line - 1)
+        if not block.isValid():
+            self.status_message.setText(f"XML 中不存在第 {line} 行")
+            return
+        cursor = QTextCursor(block)
+        cursor.select(QTextCursor.SelectionType.LineUnderCursor)
+        self.source_editor.setTextCursor(cursor)
+        self.source_editor.centerCursor()
+        self.bottom_tabs.setCurrentWidget(self.source_tab)
+        self.source_editor.setFocus()
+        if row.path:
+            self._select_object_for_source_path(row.path)
+        self.status_message.setText(f"已定位到 XML 第 {line} 行")
+
+    def _select_object_for_source_path(self, path: str) -> None:
+        for entry in self._entries:
+            source = entry.source
+            candidates = (
+                value_of(source, "element_path", default=""),
+                value_of(source, "marker_path", default=""),
+                value_of(source, "floating_path", default=""),
+                value_of(source, "shapeout_path", default=""),
+            )
+            if any(
+                candidate
+                and (path == str(candidate) or path.startswith(f"{candidate}/"))
+                for candidate in candidates
+            ):
+                self.select_object(entry.key)
+                return
+
+    def _populate_parameters(self, *_args: Any) -> None:
+        if not hasattr(self, "parameter_table"):
+            return
+        current_item = self.parameter_table.item(
+            self.parameter_table.currentRow(), 2
+        )
+        current_field = (
+            current_item.data(PARAMETER_FIELD_ROLE)
+            if current_item is not None
+            else None
+        )
+        selected_id = getattr(current_field, "id", "")
+        self._loading_parameters = True
+        try:
+            self.parameter_table.setRowCount(0)
+            if self._document is None:
+                self.parameter_explanation.setPlainText(
+                    "打开 Case_Def.xml 后显示现有标量参数。"
+                )
+                return
+            fields = tuple(
+                _document_attribute(
+                    self._document, "parameter_fields", default=()
+                )
+                or ()
+            )
+            query = self.parameter_search.text().strip().casefold()
+            category = self.parameter_category.currentData() or "all"
+            diagnostics_by_path: dict[str, list[DiagnosticRow]] = {}
+            for diagnostic in self._diagnostic_rows:
+                if diagnostic.path:
+                    diagnostics_by_path.setdefault(diagnostic.path, []).append(
+                        diagnostic
+                    )
+            filtered: list[tuple[Any, Any, str]] = []
+            for field in fields:
+                field_category = str(
+                    value_of(field, "category", default="execution")
+                )
+                if category != "all" and field_category != category:
+                    continue
+                explanation = self._parameter_explanation_for(field)
+                haystack = " ".join(
+                    (
+                        str(value_of(field, "key", default="")),
+                        str(value_of(field, "value", default="")),
+                        explanation,
+                    )
+                ).casefold()
+                if query and query not in haystack:
+                    continue
+                path = str(value_of(field, "element_path", default=""))
+                status = self._parameter_status(diagnostics_by_path.get(path, []))
+                filtered.append((field, explanation, status))
+
+            self.parameter_table.setRowCount(len(filtered))
+            draft_diagnostics = _document_attribute(
+                self._document, "draft_diagnostics", default=()
+            )
+            editable = not bool(draft_diagnostics) and not self._run_active
+            category_labels = {
+                "geometry": "几何",
+                "constants": "物理常量",
+                "execution": "执行参数",
+            }
+            for row_index, (field, explanation, status) in enumerate(filtered):
+                field_category = str(
+                    value_of(field, "category", default="execution")
+                )
+                key = str(value_of(field, "key", default=""))
+                value = str(value_of(field, "value", default=""))
+                node_explanation = self._node_explanation(
+                    str(value_of(field, "element_path", default=""))
+                )
+                unit = str(value_of(node_explanation, "units", default="") or "")
+                cells = (
+                    QTableWidgetItem(
+                        category_labels.get(field_category, field_category)
+                    ),
+                    QTableWidgetItem(key),
+                    QTableWidgetItem(value),
+                    QTableWidgetItem(unit or "—"),
+                    QTableWidgetItem(status),
+                )
+                for column, cell in enumerate(cells):
+                    if column != 2 or not editable:
+                        cell.setFlags(cell.flags() & ~Qt.ItemFlag.ItemIsEditable)
+                    cell.setData(PARAMETER_FIELD_ROLE, field)
+                    cell.setToolTip(explanation)
+                    self.parameter_table.setItem(row_index, column, cell)
+                if getattr(field, "id", "") == selected_id:
+                    self.parameter_table.selectRow(row_index)
+            if self.parameter_table.rowCount() and self.parameter_table.currentRow() < 0:
+                self.parameter_table.selectRow(0)
+        finally:
+            self._loading_parameters = False
+        self._parameter_selection_changed()
+
+    def _node_explanation(self, path: str) -> Any:
+        if self._document is None or not path:
+            return None
+        method = getattr(self._document, "explain_node", None)
+        if not callable(method):
+            return None
+        try:
+            return method(path)
+        except Exception:
+            return None
+
+    def _parameter_explanation_for(self, field: Any) -> str:
+        path = str(value_of(field, "element_path", default=""))
+        explanation = self._node_explanation(path)
+        key = str(value_of(field, "key", default="参数"))
+        if explanation is None:
+            return f"{key}\n暂无可靠的 DualSPHysics v5.4 离线解释。"
+        title = str(value_of(explanation, "title", default=key))
+        summary = str(value_of(explanation, "summary", default=""))
+        units = value_of(explanation, "units", default=None)
+        notes = tuple(value_of(explanation, "notes", default=()) or ())
+        effective = value_of(explanation, "effective", default=None)
+        heading = title if title.casefold() == key.casefold() else f"{title}（{key}）"
+        lines = [heading, summary]
+        if units:
+            lines.append(f"单位：{units}")
+        if effective is False:
+            lines.append("状态：当前参数不生效")
+        elif effective is True:
+            lines.append("状态：当前参数生效")
+        lines.extend(f"提示：{note}" for note in notes)
+        lines.append(f"XML：{path}")
+        return "\n".join(line for line in lines if line)
+
+    @staticmethod
+    def _parameter_status(rows: list[DiagnosticRow]) -> str:
+        severities = {row.severity for row in rows}
+        if "error" in severities:
+            return "错误"
+        if "warning" in severities:
+            return "警告"
+        if "info" in severities:
+            return "提示"
+        return "正常"
+
+    def _parameter_selection_changed(self) -> None:
+        if self._loading_parameters:
+            return
+        item = self.parameter_table.item(self.parameter_table.currentRow(), 2)
+        field = item.data(PARAMETER_FIELD_ROLE) if item is not None else None
+        if field is None:
+            self.parameter_explanation.setPlainText("没有符合筛选条件的参数。")
+            return
+        self.parameter_explanation.setPlainText(
+            self._parameter_explanation_for(field)
+        )
+
+    def _parameter_item_changed(self, item: QTableWidgetItem) -> None:
+        if self._loading_parameters or item.column() != 2 or self._document is None:
+            return
+        field = item.data(PARAMETER_FIELD_ROLE)
+        if field is None:
+            return
+        original = str(value_of(field, "value", default=""))
+        if item.text() == original:
+            return
+        if _document_attribute(self._document, "draft_diagnostics", default=()):
+            self.status_message.setText("请先修正 XML 源码错误，再通过参数工作台编辑")
+            self._populate_parameters()
+            return
+        method = getattr(self._document, "update_parameter_value", None)
+        if not callable(method):
+            self.status_message.setText("当前文档模型不支持参数工作台编辑")
+            self._populate_parameters()
+            return
+        try:
+            method(field, item.text())
+        except Exception as exc:
+            blocker = QSignalBlocker(self.parameter_table)
+            item.setText(original)
+            del blocker
+            self.status_message.setText(f"参数修改失败：{exc}")
+            return
+        self._dirty = True
+        self.refresh_document()
+        self._update_source_from_document()
+        self._update_title()
+        self.status_message.setText(
+            f"参数 {value_of(field, 'key', default='')} 已修改，尚未保存"
+        )
 
     def _set_geometry_actions_enabled(self, enabled: bool) -> None:
         for action in (
@@ -1640,6 +2171,8 @@ class MainWindow(QMainWindow):
             and self._selected_entry is not None
             and self._selected_entry.editable
         )
+        self.doctor_quick_check_button.setEnabled(run_enabled)
+        self._populate_parameters()
         if running:
             self.run_progress.setRange(0, 0)
             self.bottom_tabs.setCurrentWidget(self.log_tab)
@@ -1789,23 +2322,67 @@ class MainWindow(QMainWindow):
         )
         if not path:
             return
+        self._load_mesh_path(path)
+
+    def _load_mesh_path(self, path: str | Path) -> bool:
+        path = Path(path)
         suffix = Path(path).suffix.lower()
-        if suffix == ".vtk":
-            self.viewport.load_legacy_vtk(path)
-        elif suffix == ".stl":
-            self.viewport.load_stl(path)
-        else:
+        if suffix not in {".vtk", ".stl"}:
             self._report_error("不支持的 3D 文件", "仅支持 .vtk 和 .stl 文件。")
+            return False
+        try:
+            report = inspect_mesh_file(path)
+        except MeshPreflightError as exc:
+            self._report_error(
+                f"{suffix[1:].upper()} 安全预检失败",
+                f"{path.name}\n\n{exc}",
+            )
+            return False
+        if report.blocked:
+            self._report_error(
+                "模型超过安全加载上限",
+                f"{path.name}\n\n{report.summary()}",
+            )
+            return False
+        allow_large = False
+        if report.requires_confirmation:
+            answer = QMessageBox.question(
+                self,
+                "大型模型资源警告",
+                f"{path.name}\n\n{report.summary()}\n\n仍要加载本次模型吗？",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
+                QMessageBox.StandardButton.Cancel,
+            )
+            if answer != QMessageBox.StandardButton.Yes:
+                self.status_message.setText("已取消大型模型加载")
+                return False
+            allow_large = True
+        loader = (
+            self.viewport.load_legacy_vtk
+            if suffix == ".vtk"
+            else self.viewport.load_stl
+        )
+        if allow_large:
+            return loader(str(path), allow_large=True)
+        return loader(str(path))
 
     def _vtk_loaded(self, path: str) -> None:
-        self.status_message.setText(f"已加载权威 VTK：{Path(path).name}")
+        stats = self.viewport.last_mesh_stats
+        suffix = f" · {stats.points:,} 点" if stats is not None else ""
+        self.status_message.setText(f"已加载权威 VTK：{Path(path).name}{suffix}")
 
     def _vtk_failed(self, path: str, error: str) -> None:
         self._report_error("VTK 加载失败", f"{Path(path).name}\n\n{error}")
 
     def _stl_loaded(self, path: str) -> None:
+        stats = self.viewport.last_mesh_stats
+        suffix = (
+            f" · {stats.points:,} 点/{stats.cells:,} 三角形"
+            if stats is not None
+            else ""
+        )
         self.status_message.setText(
-            f"已加载 STL 表面模型（保留原始坐标与尺度）：{Path(path).name}"
+            f"已加载 STL 表面模型（保留原始坐标与尺度）：{Path(path).name}{suffix}"
         )
 
     def _stl_failed(self, path: str, error: str) -> None:
@@ -1910,6 +2487,9 @@ class MainWindow(QMainWindow):
     # --------------------------------------------------------------- misc state
     def _show_welcome_state(self) -> None:
         self.diagnostics_view.setPlainText("打开 Case_Def.xml 后显示参数和关联诊断。")
+        self._diagnostic_rows = []
+        self._populate_doctor()
+        self._populate_parameters()
         self.explanation_view.setPlainText(
             f"欢迎使用 DualSPHysics Studio {VERSION}。\n\n"
             "请打开 Case_Def.xml。模型树、3D 预览、属性表与源码将保持联动。"

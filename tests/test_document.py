@@ -17,6 +17,7 @@ from dualsphysics_studio.core import (  # noqa: E402
     GeometryType,
     ObjectRole,
     ReadOnlyGeometryError,
+    SourceLocationError,
     UnsafeXmlError,
     Vec3,
     XmlSyntaxError,
@@ -130,6 +131,67 @@ class CaseDocumentEditTests(unittest.TestCase):
         self.assertIn(comment, self.document.text)
         self.assertIn('<definition dp="0.02" units_comment="metres (m)">', self.document.text)
         self.assertAlmostEqual(self.document.dp or 0.0, 0.02)
+
+    def test_parameter_workbench_fields_edit_losslessly_and_undo(self) -> None:
+        fields = {field.key.casefold(): field for field in self.document.parameter_fields}
+        self.assertIn("dp", fields)
+        self.assertIn("gravity.x", fields)
+        self.assertIn("timemax", fields)
+        target = fields["timemax"]
+        line = self.document.source_line(target.element_path)
+        self.assertGreater(line, 1)
+        original = self.document.text
+
+        self.document.update_parameter_value(target, "12.5")
+
+        self.assertIn('key="TimeMax" value="12.5"', self.document.text)
+        self.assertIn("<!-- 中文注释必须原样保留 -->", self.document.text)
+        self.assertTrue(self.document.undo())
+        self.assertEqual(self.document.text, original)
+        with self.assertRaisesRegex(SourceLocationError, "必须大于 0"):
+            self.document.update_parameter_value(fields["dp"], "0")
+        self.assertEqual(self.document.text, original)
+
+    def test_parameter_workbench_keeps_unknown_existing_parameters_editable(self) -> None:
+        source = """<case><casedef><geometry>
+<definition dp="0.1"><pointmin x="0" y="0" z="0"/><pointmax x="1" y="1" z="1"/></definition>
+<commands><mainlist/></commands></geometry></casedef><execution><parameters>
+<parameter key="CustomSolverOption" value="vendor-default"/>
+</parameters></execution></case>"""
+        document = CaseDocument.from_text(source)
+        target = next(
+            field
+            for field in document.parameter_fields
+            if field.key == "CustomSolverOption"
+        )
+
+        document.update_parameter_value(target, "site-specific")
+
+        self.assertIn(
+            'key="CustomSolverOption" value="site-specific"', document.text
+        )
+        self.assertTrue(document.undo())
+        self.assertEqual(document.text, source)
+
+    def test_case_doctor_detects_bounds_duplicate_and_time_parameter_risks(self) -> None:
+        source = """<case><casedef><geometry>
+<definition dp="0.1"><pointmin x="2" y="0" z="0"/><pointmax x="1" y="1" z="1"/></definition>
+<commands><mainlist/></commands></geometry></casedef><execution><parameters>
+<parameter key="TimeMax" value="10"/>
+<parameter key="TimeMax" value="10"/>
+<parameter key="TimeOut" value="20"/>
+<parameter key="Kernel" value="9"/>
+<parameter value="1"/>
+</parameters></execution></case>"""
+
+        document = CaseDocument.from_text(source)
+        codes = {diagnostic.code for diagnostic in document.diagnostics}
+
+        self.assertIn("REVERSED_DEFINITION_BOUNDS", codes)
+        self.assertIn("DUPLICATE_EXECUTION_PARAMETER", codes)
+        self.assertIn("OUTPUT_INTERVAL_EXCEEDS_DURATION", codes)
+        self.assertIn("UNSUPPORTED_PARAMETER_VALUE", codes)
+        self.assertIn("MISSING_EXECUTION_PARAMETER_KEY", codes)
 
     def test_translate_floating_updates_points_and_center_atomically(self) -> None:
         scene = self.document.objects[3]

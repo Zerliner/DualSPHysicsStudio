@@ -26,6 +26,28 @@ _PLAIN_NUMBER = re.compile(
 )
 _PRISM_MASK_LIST = re.compile(r"^[\t\r\n ]*(?:0|[1-9]\d*(?:[\t\r\n ]*\|[\t\r\n ]*[1-9]\d*)*)[\t\r\n ]*$")
 
+POSITIVE_PARAMETER_KEYS = frozenset(
+    {
+        "dp",
+        "rhop0",
+        "gamma",
+        "speedsystem",
+        "coefsound",
+        "coefh",
+        "cflnumber",
+        "timemax",
+        "timeout",
+    }
+)
+INTEGER_PARAMETER_CHOICES: dict[str, frozenset[int]] = {
+    "stepalgorithm": frozenset({1, 2}),
+    "kernel": frozenset({1, 2}),
+    "viscotreatment": frozenset({1, 2, 3}),
+    "densitydt": frozenset({0, 1, 2, 3}),
+    "shifting": frozenset({0, 1, 2, 3, 4}),
+    "rigidalgorithm": frozenset({0, 1, 2, 3}),
+}
+
 
 @dataclass(slots=True)
 class SemanticModel:
@@ -99,8 +121,44 @@ def analyze(root: ET.Element) -> SemanticModel:
         point_max = _direct_child(definition, "pointmax")
         minimum = parse_vec3(point_min)
         maximum = parse_vec3(point_max)
-        if minimum is not None and maximum is not None:
+        if point_min is None or point_max is None:
+            diagnostics.append(
+                Diagnostic(
+                    "MISSING_DEFINITION_BOUNDS",
+                    Severity.ERROR,
+                    "geometry/definition 必须同时包含 pointmin 和 pointmax",
+                    path_of(definition),
+                )
+            )
+        elif minimum is None or maximum is None:
+            diagnostics.append(
+                Diagnostic(
+                    "INVALID_DEFINITION_BOUNDS",
+                    Severity.ERROR,
+                    "pointmin/pointmax 的 x、y、z 必须是有限数值",
+                    path_of(point_min if minimum is None else point_max),
+                )
+            )
+        elif any(minimum[axis] > maximum[axis] for axis in range(3)):
+            diagnostics.append(
+                Diagnostic(
+                    "REVERSED_DEFINITION_BOUNDS",
+                    Severity.ERROR,
+                    "pointmin 不能大于 pointmax",
+                    path_of(definition),
+                )
+            )
+        else:
             definition_bounds = BoundingBox(minimum, maximum)
+            if any(minimum[axis] == maximum[axis] for axis in range(3)):
+                diagnostics.append(
+                    Diagnostic(
+                        "FLAT_DEFINITION_BOUNDS",
+                        Severity.WARNING,
+                        "计算域至少有一个方向厚度为 0；请确认这是预期的二维设置",
+                        path_of(definition),
+                    )
+                )
 
     floating_by_marker: dict[int, list[_FloatingInfo]] = {}
     for floating in iter_elements(root, "floating"):
@@ -593,11 +651,113 @@ def _append_parameter_diagnostics(
     path_by_identity: dict[int, str],
     diagnostics: list[Diagnostic],
 ) -> None:
-    parameters: dict[str, ET.Element] = {}
+    occurrences: dict[str, list[ET.Element]] = {}
     for parameter in iter_elements(root, "parameter"):
-        key = parameter.get("key")
-        if key:
-            parameters[key.casefold()] = parameter
+        key = (parameter.get("key") or "").strip()
+        if not key:
+            diagnostics.append(
+                Diagnostic(
+                    "MISSING_EXECUTION_PARAMETER_KEY",
+                    Severity.ERROR,
+                    "execution/parameter 缺少 key",
+                    path_by_identity.get(id(parameter)),
+                )
+            )
+            continue
+        if not (parameter.get("value") or "").strip():
+            diagnostics.append(
+                Diagnostic(
+                    "MISSING_EXECUTION_PARAMETER_VALUE",
+                    Severity.ERROR,
+                    f"{key} 缺少 value",
+                    path_by_identity.get(id(parameter)),
+                )
+            )
+        occurrences.setdefault(key.casefold(), []).append(parameter)
+
+    for key, entries in occurrences.items():
+        if len(entries) > 1:
+            display = entries[0].get("key") or key
+            diagnostics.append(
+                Diagnostic(
+                    "DUPLICATE_EXECUTION_PARAMETER",
+                    Severity.WARNING,
+                    f"{display} 被重复定义 {len(entries)} 次，请明确保留一个值",
+                    path_by_identity.get(id(entries[1])),
+                )
+            )
+
+    parameters = {key: entries[-1] for key, entries in occurrences.items()}
+
+    for key, choices in INTEGER_PARAMETER_CHOICES.items():
+        parameter = parameters.get(key)
+        if parameter is None:
+            continue
+        value = parse_integer(parameter.get("value"))
+        if value is not None and value not in choices:
+            display = parameter.get("key") or key
+            allowed = "、".join(str(item) for item in sorted(choices))
+            diagnostics.append(
+                Diagnostic(
+                    "UNSUPPORTED_PARAMETER_VALUE",
+                    Severity.ERROR,
+                    f"{display}={value} 不受 v5.4 工作台支持；可选值为 {allowed}",
+                    path_by_identity.get(id(parameter)),
+                )
+            )
+
+    for key in ("timemax", "timeout"):
+        parameter = parameters.get(key)
+        if parameter is None:
+            continue
+        value = parse_number(parameter.get("value"))
+        if value is not None and value <= 0:
+            diagnostics.append(
+                Diagnostic(
+                    "NONPOSITIVE_TIME_PARAMETER",
+                    Severity.ERROR,
+                    f"{parameter.get('key') or key} 必须大于 0",
+                    path_by_identity.get(id(parameter)),
+                )
+            )
+    time_max = parse_number(parameters["timemax"].get("value")) if "timemax" in parameters else None
+    time_out = parse_number(parameters["timeout"].get("value")) if "timeout" in parameters else None
+    if (
+        time_max is not None
+        and time_out is not None
+        and time_max > 0
+        and time_out > time_max
+    ):
+        diagnostics.append(
+            Diagnostic(
+                "OUTPUT_INTERVAL_EXCEEDS_DURATION",
+                Severity.WARNING,
+                "TimeOut 大于 TimeMax，模拟期间可能只产生初始输出",
+                path_by_identity.get(id(parameters["timeout"])),
+            )
+        )
+
+    for constant_name in (
+        "rhop0",
+        "gamma",
+        "speedsystem",
+        "coefsound",
+        "coefh",
+        "cflnumber",
+    ):
+        element = next(iter(iter_elements(root, constant_name)), None)
+        if element is None:
+            continue
+        value = parse_number(element.get("value"))
+        if value is not None and value <= 0:
+            diagnostics.append(
+                Diagnostic(
+                    "NONPOSITIVE_CONSTANT",
+                    Severity.ERROR,
+                    f"{constant_name}.value 必须大于 0",
+                    path_by_identity.get(id(element)),
+                )
+            )
 
     step = parameters.get("stepalgorithm")
     verlet = parameters.get("verletsteps")

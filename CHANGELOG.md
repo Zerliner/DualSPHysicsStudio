@@ -2,6 +2,32 @@
 
 All notable changes to DualSPHysics Studio are documented in this file.
 
+## [1.0.1] - 2026-07-29
+
+### Added
+
+- Added a resizable case-doctor detail window with complete diagnostic text,
+  XML path, resolved source line, nearby XML context, and an explicit source
+  navigation action; double-clicking the location column keeps direct
+  navigation available in the compact inspector table.
+- Added bounded STL and legacy VTK preflight with file, point, cell, and
+  conservative memory estimates before VTK allocates a dataset.
+- Added a case-doctor tab with severity summaries, filtering, source-line
+  navigation, and direct access to the existing GenCase quick check.
+- Added diagnostics for definition bounds, duplicate or incomplete execution
+  parameters, unsupported known enum values, non-positive time/constants, and
+  output intervals longer than the simulation.
+- Added a searchable parameter workbench for existing `dp`, physical constants,
+  gravity components, and execution parameters, using the canonical lossless
+  edit and undo history.
+
+### Security
+
+- Large meshes now require explicit confirmation above the documented soft
+  budget and are blocked above the 4 GiB or 25-million-element hard budgets.
+- Loaded datasets are rejected before rendering when their counts or bounds are
+  invalid, non-finite, or above the application hard budget.
+
 ## [1.0.0] - 2026-07-28
 
 Initial public release.

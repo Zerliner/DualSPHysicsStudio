@@ -17,6 +17,7 @@ def _smoke_test() -> int:
 
     from .catalog import SemanticCatalog
     from .core import CaseDocument
+    from .core.mesh_guard import inspect_mesh_file, validate_loaded_dataset
     from .extensions import default_dlc_directory, discover_extension_tools
     from .pipeline import (
         DualSPHysicsCPUAdapter,
@@ -59,8 +60,12 @@ def _smoke_test() -> int:
         stl_reader = vtkSTLReader()
         stl_reader.SetFileName(str(stl_path))
         stl_reader.Update()
+        stl_report = inspect_mesh_file(stl_path)
+        validate_loaded_dataset(stl_reader.GetOutput())
         if stl_reader.GetOutput().GetNumberOfPoints() != 3:
             raise RuntimeError("STL reader smoke test failed")
+        if stl_report.estimated_cells != 1:
+            raise RuntimeError("STL resource preflight smoke test failed")
 
         vtk_path = temporary_path / "triangle.vtk"
         vtk_path.write_text(
@@ -77,8 +82,12 @@ def _smoke_test() -> int:
         vtk_reader = vtkDataSetReader()
         vtk_reader.SetFileName(str(vtk_path))
         vtk_reader.Update()
+        vtk_report = inspect_mesh_file(vtk_path)
+        validate_loaded_dataset(vtk_reader.GetOutput())
         if vtk_reader.GetOutput().GetNumberOfCells() != 1:
             raise RuntimeError("legacy VTK reader smoke test failed")
+        if vtk_report.estimated_points != 3:
+            raise RuntimeError("VTK resource preflight smoke test failed")
 
     points = vtkPoints()
     points.InsertNextPoint(0.0, 0.0, 0.0)

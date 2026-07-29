@@ -38,8 +38,16 @@ from .models import (
     SceneObject,
     Severity,
     Vec3,
+    XmlParameterField,
 )
-from .semantics import SemanticModel, analyze, parse_integer, parse_number
+from .semantics import (
+    INTEGER_PARAMETER_CHOICES,
+    POSITIVE_PARAMETER_KEYS,
+    SemanticModel,
+    analyze,
+    parse_integer,
+    parse_number,
+)
 from .source import (
     MAX_XML_BYTES,
     SourceIndex,
@@ -250,6 +258,57 @@ class CaseDocument:
         return self._model.facts
 
     @property
+    def parameter_fields(self) -> tuple[XmlParameterField, ...]:
+        """Return existing scalar fields without creating parallel XML state."""
+
+        fields: list[XmlParameterField] = []
+        for path, element in self._model.element_by_path.items():
+            name = local_name(element.tag)
+            if name == "definition" and "dp" in element.attrib:
+                fields.append(
+                    XmlParameterField(
+                        "dp", "geometry", path, "dp", element.get("dp", "")
+                    )
+                )
+                continue
+            if "/constantsdef[" in path:
+                if name == "gravity":
+                    for axis in ("x", "y", "z"):
+                        if axis in element.attrib:
+                            fields.append(
+                                XmlParameterField(
+                                    f"gravity.{axis}",
+                                    "constants",
+                                    path,
+                                    axis,
+                                    element.get(axis, ""),
+                                )
+                            )
+                elif "value" in element.attrib:
+                    fields.append(
+                        XmlParameterField(
+                            name,
+                            "constants",
+                            path,
+                            "value",
+                            element.get("value", ""),
+                        )
+                    )
+                continue
+            if name == "parameter":
+                key = (element.get("key") or "").strip() or "（未命名参数）"
+                fields.append(
+                    XmlParameterField(
+                        key,
+                        "execution",
+                        path,
+                        "value",
+                        element.get("value", ""),
+                    )
+                )
+        return tuple(fields)
+
+    @property
     def dp(self) -> float | None:
         return self._model.facts.dp
 
@@ -305,6 +364,50 @@ class CaseDocument:
         """Return a conservative Chinese v5.4 explanation for one node."""
 
         return explain(self.element(path), self._root)
+
+    def source_line(self, path: str) -> int:
+        """Return the one-based source line for a stable element path."""
+
+        token = self._source_index.require(path)
+        return self._text.count("\n", 0, token.start) + 1
+
+    def update_parameter_value(
+        self, field: XmlParameterField | str, value: object
+    ) -> None:
+        """Update one workbench field through the canonical lossless patcher."""
+
+        if isinstance(field, XmlParameterField):
+            selected = field
+        else:
+            selected = next(
+                (
+                    candidate
+                    for candidate in self.parameter_fields
+                    if candidate.id == field or candidate.element_path == field
+                ),
+                None,
+            )
+            if selected is None:
+                raise SourceLocationError(f"找不到 XML 参数：{field}")
+        text = str(value).strip()
+        if not text:
+            raise SourceLocationError(f"{selected.key} 的值不能为空")
+        normalized = selected.key.casefold()
+        if normalized in POSITIVE_PARAMETER_KEYS:
+            number = parse_number(text)
+            if number is not None and number <= 0:
+                raise SourceLocationError(f"{selected.key} 必须大于 0")
+        choices = INTEGER_PARAMETER_CHOICES.get(normalized)
+        integer = parse_integer(text)
+        if choices is not None and integer is not None and integer not in choices:
+            allowed = "、".join(str(item) for item in sorted(choices))
+            raise SourceLocationError(f"{selected.key} 仅支持：{allowed}")
+        self.update_attribute(
+            selected.element_path,
+            selected.attribute,
+            text,
+            description=f"修改参数 {selected.key}",
+        )
 
     def stage_source(self, text: str) -> bool:
         """Try source-editor text while retaining the last valid scene on error."""

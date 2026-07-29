@@ -4,13 +4,14 @@ import os
 from pathlib import Path
 import re
 import struct
+from types import SimpleNamespace
 
 import pytest
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QApplication, QDialog, QToolBar
+from PySide6.QtWidgets import QApplication, QDialog, QPlainTextEdit, QPushButton, QToolBar
 from shiboken6 import delete
 
 import dualsphysics_studio.ui.dialogs as dialogs_module
@@ -644,6 +645,24 @@ def _write_binary_stl(path: Path) -> None:
     path.write_bytes(header + struct.pack("<I", 1) + triangle)
 
 
+def _write_legacy_vtk(path: Path) -> None:
+    path.write_text(
+        "\n".join(
+            (
+                "# vtk DataFile Version 3.0",
+                "sample",
+                "ASCII",
+                "DATASET POLYDATA",
+                "POINTS 3 float",
+                "0 0 0 1 0 0 0 1 0",
+                "POLYGONS 1 4",
+                "3 0 1 2",
+            )
+        ),
+        encoding="ascii",
+    )
+
+
 @pytest.mark.parametrize(
     ("filename", "writer"),
     (
@@ -731,6 +750,214 @@ def _write_fake_executable(path: Path) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(b"MZ fake extension")
     return path.resolve()
+
+
+def test_case_doctor_filters_and_jumps_to_the_diagnostic_source_line(
+    qapp: QApplication, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = """<case>
+  <casedef>
+    <geometry>
+      <definition dp="0">
+        <pointmin x="2" y="0" z="0"/>
+        <pointmax x="1" y="1" z="1"/>
+      </definition>
+      <commands><mainlist/></commands>
+    </geometry>
+  </casedef>
+</case>"""
+    document = CaseDocument.from_text(source)
+    window = _main_window_without_vtk(monkeypatch)
+    window.set_document(document)
+
+    assert "错误" in window.doctor_summary.text()
+    target = next(
+        window.doctor_table.topLevelItem(index)
+        for index in range(window.doctor_table.topLevelItemCount())
+        if "pointmin" in window.doctor_table.topLevelItem(index).text(1)
+    )
+    row = target.data(0, main_window_module.DIAGNOSTIC_ROW_ROLE)
+    window.doctor_table.setCurrentItem(target)
+
+    window.doctor_table.itemDoubleClicked.emit(target, 1)
+    qapp.processEvents()
+    dialog = window._diagnostic_detail_dialog
+
+    assert isinstance(dialog, QDialog)
+    assert dialog.isVisible()
+    assert row.code in dialog.windowTitle() or row.code in (
+        dialog.findChild(main_window_module.QLabel, "diagnostic_detail_heading").text()
+    )
+    assert (
+        dialog.findChild(QPlainTextEdit, "diagnostic_detail_message").toPlainText()
+        == row.message
+    )
+    location_text = dialog.findChild(
+        QPlainTextEdit, "diagnostic_detail_location"
+    ).toPlainText()
+    assert row.path in location_text
+    assert f"第 {document.source_line(row.path)} 行" in location_text
+    source_context = dialog.findChild(
+        QPlainTextEdit, "diagnostic_detail_source"
+    ).toPlainText()
+    assert "→" in source_context
+    assert "<pointmin" in source_context
+
+    window.doctor_table.itemDoubleClicked.emit(target, 2)
+    qapp.processEvents()
+
+    assert row.path
+    assert (
+        window.source_editor.textCursor().blockNumber()
+        == document.source_line(row.path) - 1
+    )
+    assert window.bottom_tabs.currentWidget() is window.source_tab
+
+    detail_jump = dialog.findChild(
+        QPushButton, "diagnostic_detail_jump_button"
+    )
+    assert detail_jump.isEnabled()
+    detail_jump.click()
+    qapp.processEvents()
+    assert "已定位到 XML" in window.status_message.text()
+
+    warning_index = window.doctor_filter.findData("warning")
+    window.doctor_filter.setCurrentIndex(warning_index)
+    qapp.processEvents()
+    assert all(
+        window.doctor_table.topLevelItem(index).text(0) == "警告"
+        for index in range(window.doctor_table.topLevelItemCount())
+    )
+
+    requested: list[bool] = []
+    window.quickCheckRequested.connect(lambda: requested.append(True))
+    window.doctor_quick_check_button.click()
+    qapp.processEvents()
+    assert requested == [True]
+
+    dialog.close()
+    delete(window)
+    qapp.processEvents()
+
+
+def test_parameter_workbench_searches_edits_and_undoes_existing_values(
+    qapp: QApplication, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fixture = Path(__file__).parent / "fixtures" / "sample_case.xml"
+    document = CaseDocument.from_file(fixture)
+    original = document.text
+    window = _main_window_without_vtk(monkeypatch)
+    window.set_document(document)
+
+    window.parameter_search.setText("TimeMax")
+    qapp.processEvents()
+    assert window.parameter_table.rowCount() == 1
+    assert window.parameter_table.item(0, 1).text() == "TimeMax"
+    assert window.parameter_table.item(0, 3).text() == "s"
+
+    value_item = window.parameter_table.item(0, 2)
+    old_value = value_item.text()
+    value_item.setText("0")
+    qapp.processEvents()
+    assert value_item.text() == old_value
+    assert "必须大于 0" in window.status_message.text()
+
+    value_item.setText("12.5")
+    qapp.processEvents()
+    assert 'key="TimeMax" value="12.5"' in document.text
+    assert "TimeMax" in window.parameter_explanation.toPlainText()
+
+    window.undo()
+    assert document.text == original
+
+    delete(window)
+    qapp.processEvents()
+
+
+def test_parameter_workbench_disables_edits_while_source_draft_is_invalid(
+    qapp: QApplication, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fixture = Path(__file__).parent / "fixtures" / "sample_case.xml"
+    document = CaseDocument.from_file(fixture)
+    assert not document.stage_source("<case>")
+    window = _main_window_without_vtk(monkeypatch)
+    window.set_document(document)
+
+    window.parameter_search.setText("TimeMax")
+    qapp.processEvents()
+
+    assert window.parameter_table.rowCount() == 1
+    value_item = window.parameter_table.item(0, 2)
+    assert not (value_item.flags() & Qt.ItemFlag.ItemIsEditable)
+
+    delete(window)
+    qapp.processEvents()
+
+
+def test_large_mesh_warning_requires_confirmation_before_viewport_load(
+    qapp: QApplication, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    window = _main_window_without_vtk(monkeypatch)
+    target = tmp_path / "large.stl"
+    _write_ascii_stl(target)
+    report = SimpleNamespace(
+        blocked=False,
+        requires_confirmation=True,
+        summary=lambda: "文件大小：600 MiB\n保守内存估算：约 2 GiB",
+    )
+    monkeypatch.setattr(
+        main_window_module, "inspect_mesh_file", lambda _path: report
+    )
+    questions: list[str] = []
+    monkeypatch.setattr(
+        main_window_module.QMessageBox,
+        "question",
+        lambda _parent, _title, message, _buttons, _default: (
+            questions.append(message) or main_window_module.QMessageBox.StandardButton.Yes
+        ),
+    )
+    loaded: list[tuple[str, bool]] = []
+    window.viewport.load_stl = lambda path, *, allow_large=False: (
+        loaded.append((path, allow_large)) or True
+    )
+
+    assert window._load_mesh_path(target)
+    assert questions
+    assert loaded == [(str(target), True)]
+
+    delete(window)
+    qapp.processEvents()
+
+
+def test_blocked_mesh_never_reaches_the_viewport_loader(
+    qapp: QApplication, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    window = _main_window_without_vtk(monkeypatch)
+    target = tmp_path / "oversized.stl"
+    _write_ascii_stl(target)
+    report = SimpleNamespace(
+        blocked=True,
+        requires_confirmation=True,
+        summary=lambda: "超过安全上限",
+    )
+    monkeypatch.setattr(
+        main_window_module, "inspect_mesh_file", lambda _path: report
+    )
+    errors: list[tuple[str, str]] = []
+    monkeypatch.setattr(
+        window,
+        "_report_error",
+        lambda title, message: errors.append((title, message)),
+    )
+    loaded: list[str] = []
+    window.viewport.load_stl = lambda path, **_kwargs: loaded.append(path) or True
+
+    assert not window._load_mesh_path(target)
+    assert errors and "安全加载上限" in errors[0][0]
+    assert loaded == []
+
+    delete(window)
+    qapp.processEvents()
 
 
 def test_extensions_menu_is_between_run_and_help_and_ends_with_scan(
@@ -825,6 +1052,7 @@ def test_3d_file_dialog_uses_strict_filter_and_dispatches_by_suffix(
 ) -> None:
     window = _main_window_without_vtk(monkeypatch)
     selected = tmp_path / f"中文 模型{suffix}"
+    (_write_legacy_vtk if suffix == ".vtk" else _write_ascii_stl)(selected)
     dialog_calls: list[tuple[str, str, str]] = []
 
     def fake_open_file_name(_parent, title: str, initial: str, filters: str):

@@ -1,4 +1,4 @@
-"""Executable pipeline API for DualSPHysics Studio 1.0.0."""
+"""Executable pipeline API for DualSPHysics Studio 1.0.1."""
 
 from .base import (
     IncompatibleToolError,

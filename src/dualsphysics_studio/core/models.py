@@ -110,6 +110,21 @@ class Diagnostic:
 
 
 @dataclass(frozen=True, slots=True)
+class XmlParameterField:
+    """One existing scalar XML field exposed by the parameter workbench."""
+
+    key: str
+    category: str
+    element_path: str
+    attribute: str
+    value: str
+
+    @property
+    def id(self) -> str:
+        return f"{self.element_path}@{self.attribute}"
+
+
+@dataclass(frozen=True, slots=True)
 class SceneObject:
     """A directly editable ``drawbox`` or ``drawprism`` command.
 

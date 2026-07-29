@@ -1,8 +1,8 @@
 # UTF-8
 VSVersionInfo(
   ffi=FixedFileInfo(
-    filevers=(1, 0, 0, 0),
-    prodvers=(1, 0, 0, 0),
+    filevers=(1, 0, 1, 0),
+    prodvers=(1, 0, 1, 0),
     mask=0x3f,
     flags=0x0,
     OS=0x40004,
@@ -16,12 +16,12 @@ VSVersionInfo(
         u'080404b0',
         [
           StringStruct(u'FileDescription', u'DualSPHysics v5.4 XML visual editor and local pipeline frontend'),
-          StringStruct(u'FileVersion', u'1.0.0.0'),
+          StringStruct(u'FileVersion', u'1.0.1.0'),
           StringStruct(u'InternalName', u'DualSPHysicsStudio'),
           StringStruct(u'LegalCopyright', u'Copyright (c) 2026 Fang Li'),
           StringStruct(u'OriginalFilename', u'DualSPHysicsStudio.exe'),
           StringStruct(u'ProductName', u'DualSPHysics Studio'),
-          StringStruct(u'ProductVersion', u'1.0.0')
+          StringStruct(u'ProductVersion', u'1.0.1')
         ]
       )
     ]),

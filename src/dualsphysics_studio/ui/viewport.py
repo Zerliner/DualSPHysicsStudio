@@ -14,6 +14,13 @@ from PySide6.QtCore import QPoint, Qt, Signal
 from PySide6.QtGui import QColor, QPalette
 from PySide6.QtWidgets import QLabel, QSizePolicy, QVBoxLayout, QWidget
 
+from ..core.mesh_guard import (
+    MeshDatasetStats,
+    MeshPreflightError,
+    MeshPreflightReport,
+    inspect_mesh_file,
+    validate_loaded_dataset,
+)
 from .models import (
     CATEGORY_COLORS,
     box_spec,
@@ -101,6 +108,8 @@ class VTKViewport(QWidget):
         self._editable_keys: set[str] = set()
         self._vertices_by_key: dict[str, tuple[tuple[float, float, float], ...]] = {}
         self._vtk_keys: set[str] = set()
+        self._last_mesh_report: MeshPreflightReport | None = None
+        self._last_mesh_stats: MeshDatasetStats | None = None
         self._domain_actor: Any | None = None
         self._selected_key: str | None = None
         self._initialized = False
@@ -202,6 +211,14 @@ class VTKViewport(QWidget):
     @property
     def scene_object_count(self) -> int:
         return len(self._scene_keys)
+
+    @property
+    def last_mesh_report(self) -> MeshPreflightReport | None:
+        return self._last_mesh_report
+
+    @property
+    def last_mesh_stats(self) -> MeshDatasetStats | None:
+        return self._last_mesh_stats
 
     def showEvent(self, event: Any) -> None:  # noqa: N802 - Qt API
         super().showEvent(event)
@@ -755,7 +772,9 @@ class VTKViewport(QWidget):
         except Exception:
             pass
 
-    def load_legacy_vtk(self, path: str | Path) -> bool:
+    def load_legacy_vtk(
+        self, path: str | Path, *, allow_large: bool = False
+    ) -> bool:
         """Load a legacy VTK dataset and render it as authoritative particles."""
 
         path = Path(path)
@@ -769,14 +788,15 @@ class VTKViewport(QWidget):
             return False
 
         try:
+            report = inspect_mesh_file(path)
+            self._require_permitted_report(report, allow_large=allow_large)
             reader = vtkDataSetReader()
             reader.SetFileName(str(path))
             reader.ReadAllScalarsOn()
             reader.ReadAllVectorsOn()
             reader.Update()
             dataset = reader.GetOutput()
-            if dataset is None or dataset.GetNumberOfPoints() <= 0:
-                raise ValueError("文件中没有可显示的点")
+            stats = validate_loaded_dataset(dataset)
 
             mapper = vtkDataSetMapper()
             mapper.SetInputConnection(reader.GetOutputPort())
@@ -797,6 +817,8 @@ class VTKViewport(QWidget):
             self._base_color[key] = CATEGORY_COLORS["vtk"]
             self._vtk_keys.add(key)
             self._renderer.AddActor(actor)
+            self._last_mesh_report = report
+            self._last_mesh_stats = stats
             self.reset_camera()
             self.vtkLoaded.emit(str(path))
             return True
@@ -804,7 +826,7 @@ class VTKViewport(QWidget):
             self.vtkLoadFailed.emit(str(path), str(exc))
             return False
 
-    def load_stl(self, path: str | Path) -> bool:
+    def load_stl(self, path: str | Path, *, allow_large: bool = False) -> bool:
         """Load an ASCII or binary STL surface at its original coordinates."""
 
         path = Path(path)
@@ -818,16 +840,15 @@ class VTKViewport(QWidget):
             return False
 
         try:
+            report = inspect_mesh_file(path)
+            self._require_permitted_report(report, allow_large=allow_large)
             reader = vtkSTLReader()
             reader.SetFileName(str(path))
             reader.Update()
             polydata = reader.GetOutput()
-            if (
-                polydata is None
-                or polydata.GetNumberOfPoints() <= 0
-                or polydata.GetNumberOfCells() <= 0
-            ):
-                raise ValueError("文件中没有可显示的三角网格")
+            stats = validate_loaded_dataset(polydata)
+            if stats.cells <= 0:
+                raise MeshPreflightError("文件中没有可显示的三角网格。")
 
             mapper = vtkPolyDataMapper()
             mapper.SetInputConnection(reader.GetOutputPort())
@@ -848,6 +869,8 @@ class VTKViewport(QWidget):
             self._base_color[key] = CATEGORY_COLORS["vtk"]
             self._vtk_keys.add(key)
             self._renderer.AddActor(actor)
+            self._last_mesh_report = report
+            self._last_mesh_stats = stats
             self.reset_camera()
             self.stlLoaded.emit(str(path))
             return True
@@ -855,12 +878,27 @@ class VTKViewport(QWidget):
             self.stlLoadFailed.emit(str(path), str(exc))
             return False
 
+    @staticmethod
+    def _require_permitted_report(
+        report: MeshPreflightReport, *, allow_large: bool
+    ) -> None:
+        if report.blocked:
+            raise MeshPreflightError(
+                "安全预检已阻止加载。\n\n" + report.summary()
+            )
+        if report.requires_confirmation and not allow_large:
+            raise MeshPreflightError(
+                "该模型需要用户确认资源风险后才能加载。\n\n" + report.summary()
+            )
+
     def clear_loaded_vtk(self) -> None:
         if not VTK_AVAILABLE:
             return
         for key in tuple(self._vtk_keys):
             self._remove_actor(key)
         self._vtk_keys.clear()
+        self._last_mesh_report = None
+        self._last_mesh_stats = None
         self._safe_render()
 
     def _safe_render(self) -> None:

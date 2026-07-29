@@ -56,6 +56,16 @@ class BoxSpec:
     rotation: tuple[float, float, float]
 
 
+@dataclass(frozen=True, slots=True)
+class DiagnosticRow:
+    code: str
+    severity: str
+    severity_label: str
+    message: str
+    path: str
+    line: int | None
+
+
 def value_of(obj: Any, *names: str, default: Any = None) -> Any:
     """Return the first present mapping key or object attribute."""
 
@@ -386,11 +396,15 @@ def property_rows(obj: Any) -> list[tuple[str, str, str, Any]]:
     return rows
 
 
-def diagnostic_text(diagnostic: Any) -> str:
+def diagnostic_row(diagnostic: Any) -> DiagnosticRow:
     if isinstance(diagnostic, str):
-        return diagnostic.strip()
+        return DiagnosticRow("", "info", "提示", diagnostic.strip(), "", None)
     raw_severity = value_of(diagnostic, "severity", "level", default="提示")
     severity = str(getattr(raw_severity, "value", raw_severity)).strip().lower()
+    normalized_severity = {
+        "warn": "warning",
+        "hint": "info",
+    }.get(severity, severity)
     severity_label = {
         "error": "错误",
         "warning": "警告",
@@ -405,10 +419,52 @@ def diagnostic_text(diagnostic: Any) -> str:
         details = value_of(diagnostic, "details", default={})
         if isinstance(details, Mapping):
             line = details.get("line")
-    location = path
-    if line not in (None, ""):
-        location = f"{location}，第 {line} 行" if location else f"第 {line} 行"
-    return f"[{severity_label}] {message}" + (f"\n  位置：{location}" if location else "")
+    try:
+        resolved_line = int(line) if line not in (None, "") else None
+    except (TypeError, ValueError):
+        resolved_line = None
+    code = str(value_of(diagnostic, "code", default="")).strip()
+    return DiagnosticRow(
+        code,
+        normalized_severity
+        if normalized_severity in {"error", "warning", "info"}
+        else "info",
+        severity_label,
+        message,
+        path,
+        resolved_line,
+    )
+
+
+def diagnostic_rows(diagnostics: Iterable[Any] | None) -> list[DiagnosticRow]:
+    return [
+        row
+        for row in (diagnostic_row(item) for item in diagnostics or ())
+        if row.message
+    ]
+
+
+def diagnostic_counts(
+    diagnostics: Iterable[Any] | None,
+) -> dict[str, int]:
+    counts = {"error": 0, "warning": 0, "info": 0}
+    for row in diagnostic_rows(diagnostics):
+        counts[row.severity] += 1
+    return counts
+
+
+def diagnostic_text(diagnostic: Any) -> str:
+    row = diagnostic_row(diagnostic)
+    location = row.path
+    if row.line is not None:
+        location = (
+            f"{location}，第 {row.line} 行"
+            if location
+            else f"第 {row.line} 行"
+        )
+    return f"[{row.severity_label}] {row.message}" + (
+        f"\n  位置：{location}" if location else ""
+    )
 
 
 def diagnostics_to_text(diagnostics: Iterable[Any] | None) -> str:

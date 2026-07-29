@@ -19,15 +19,21 @@ scope. Version labels are planning buckets, not delivery-date commitments.
 
 ## v1.0.x — stabilization
 
-1. Collect reproducible bug reports from the first public release.
-2. Add an opt-in diagnostic export containing version, stage logs, and
+1. Completed in v1.0.1: add application-level byte and complexity guards around
+   user-opened STL and legacy VTK files, including preflight estimates,
+   confirmation budgets, hard limits, and post-load validation.
+2. Completed in v1.0.1: add a case doctor with severity filtering, source
+   navigation, high-confidence bounds and execution-parameter checks, and a
+   bridge to the GenCase quick check.
+3. Completed in v1.0.1: expose an initial searchable parameter workbench for
+   existing scalar values while retaining XML as the only source of truth.
+4. Collect reproducible bug reports from the public releases.
+5. Add an opt-in diagnostic export containing version, stage logs, and
    non-sensitive environment facts while excluding case content, credentials,
    and personal paths by default.
-3. Add application-level byte and complexity guards around user-opened STL and
-   legacy VTK files, with compatibility tests for valid engineering models.
-4. Exercise the portable build in CI or a controlled release workflow and add
+6. Exercise the portable build in CI or a controlled release workflow and add
    Authenticode signing when a publisher certificate is available.
-5. Keep Python and pinned dependencies current through reviewed, audited patch
+7. Keep Python and pinned dependencies current through reviewed, audited patch
    releases.
 
 Exit evidence: reproduced issues have regression tests; the complete Windows
@@ -36,9 +42,9 @@ remain clean.
 
 ## v1.1 — XML authoring completeness
 
-1. Expand parameter help and validation coverage for frequently used
-   DualSPHysics v5.4 XML sections.
-2. Improve structure-tree navigation, search, diagnostics, and error
+1. Expand the v1.0.1 parameter workbench help and validation coverage to
+   additional frequently used DualSPHysics v5.4 XML sections.
+2. Extend structure-tree navigation beyond the v1.0.1 diagnostic source
    localization without replacing the XML source as the source of truth.
 3. Extend direct geometry editing only where round-trip behavior can preserve
    comments, unsupported attributes, and unrelated formatting.
@@ -92,9 +98,9 @@ Exit evidence: the current OSGB-to-STL package remains auto-detected, legacy
 packages keep working, and manifest-based tools expose clearer provenance
 without expanding their execution authority.
 
-## Recommended first development ticket
+## Recommended next development ticket
 
-Implement the STL/VTK application-level resource guard as the first v1.0.x
-change. It closes the only retained parser-hardening note from the v1.0.0
-security review, has a narrow scope, and can be verified with small synthetic
-fixtures before broader editor or simulation features begin.
+After validating the v1.0.1 portable package, implement the opt-in,
+privacy-filtered diagnostic export. It gives public bug reports a reproducible
+source of truth without collecting case XML, credentials, or personal paths by
+default.

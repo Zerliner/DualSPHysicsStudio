@@ -1,4 +1,4 @@
-"""Application controller for DualSPHysics Studio 1.0.0.
+"""Application controller for DualSPHysics Studio 1.0.1.
 
 Qt widgets live in :mod:`dualsphysics_studio.ui`; this module connects them to
 the lossless document, local DualSPHysics pipeline, persistent settings, and

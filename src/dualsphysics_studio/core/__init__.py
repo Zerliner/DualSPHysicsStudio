@@ -1,4 +1,4 @@
-"""Public core API for DualSPHysics Studio 1.0.0."""
+"""Public core API for DualSPHysics Studio 1.0.1."""
 
 from .document import CaseDocument
 from .errors import (
@@ -22,6 +22,7 @@ from .models import (
     SceneObject,
     Severity,
     Vec3,
+    XmlParameterField,
 )
 
 __all__ = [
@@ -44,4 +45,5 @@ __all__ = [
     "UnsafeXmlError",
     "Vec3",
     "XmlSyntaxError",
+    "XmlParameterField",
 ]

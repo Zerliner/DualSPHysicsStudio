@@ -1,4 +1,4 @@
-# DualSPHysics Studio 1.0.0
+# DualSPHysics Studio 1.0.1
 
 面向 DualSPHysics v5.4 的 Windows XML 可视化编辑器与本地计算流程前端。
 
@@ -6,10 +6,10 @@ Copyright © 2026 Fang Li。项目采用 [MIT License](LICENSE) 发布。
 
 ## 主要能力
 
-- XML 源码、结构树、参数说明和 3D 场景联动。
+- XML 源码、结构树、可搜索参数工作台和 3D 场景联动；现有标量参数可通过无损补丁安全编辑。
 - `drawbox`、`drawprism` 的轻量表面预览、逐顶点拖动、旋转、缩放与精确坐标编辑；单独移动 `drawbox` 顶点时会转换为 8 点 `drawprism`，并以 XML 注释保留原命令。
-- 加载外部 3D 文件时仅支持 `.vtk` 和 `.stl`；STL 由 VTK 直接显示并保留原坐标与尺度，只用于查看，不会回写 XML。
-- 流体、固定边界和浮动刚体关联诊断。
+- 加载外部 3D 文件时仅支持 `.vtk` 和 `.stl`；读取前执行文件、点和单元预算预检，大型模型需确认，超过硬上限则阻止加载。
+- “算例医生”汇总并筛选 XML 结构、计算域、marker、参数生效状态和时间配置问题；双击问题可在独立详情页查看完整描述、XML 路径、行号和源码上下文，双击位置仍可直接跳转到对应源码行。
 - 直接调用已有 `GenCase_win64.exe`、`DualSPHysics5.4CPU_win64.exe`、`DualSPHysics5.4_win64.exe` 和 `PartVTK_win64.exe`，依次生成初始模型、CPU/GPU 求解数据和粒子 VTK。
 - “拓展功能”菜单按需发现便携目录 `DLC` 中由用户单独放入的独立 EXE，只有用户点击工具后才直接启动。
 - 可选 OpenAI Responses API 中文解读；离线功能不需要密钥或网络。
@@ -35,12 +35,12 @@ python -m venv .venv
 
 若当前环境已安装 `requirements-lock.txt` 中的固定版本，可添加 `-SkipInstall`。构建脚本使用 PyInstaller `onedir`，只生成目录，不额外创建 ZIP：
 
-- `outputs\DualSPHysics Studio-v1.0.0 (windows x64)\`
+- `outputs\DualSPHysics Studio-v1.0.1 (windows x64)\`
 
 便携目录包含中文快速说明和合并后的第三方许可证，不包含 Python `*.dist-info` 安装元数据、DualSPHysics 官方二进制或任何案例文件。其基本结构为：
 
 ```text
-DualSPHysics Studio-v1.0.0 (windows x64)\
+DualSPHysics Studio-v1.0.1 (windows x64)\
   DualSPHysicsStudio.exe
   _internal\
   快速说明.md
@@ -58,6 +58,7 @@ DualSPHysics Studio-v1.0.0 (windows x64)\
 
 - XML 解析禁用 DTD、外部实体和网络访问。
 - XML 文件在完整读取前执行 80 MiB 字节上限检查，并继续执行字符数、元素数和嵌套深度限制。
+- STL/legacy VTK 在交给 VTK 读取器前执行有界预检；512 MiB、500 万点/单元或约 2 GiB 内存估算触发确认，4 GiB 或 2500 万点/单元触发硬阻断。
 - GenCase、CPU/GPU 求解器和 PartVTK 均以参数数组直接启动，不经过 BAT 或命令行 shell。
 - GenCase、CPU/GPU 求解器和 PartVTK 仅从已保存设置、`DUALSPHYSICS_ROOT` 或用户明确选择的目录解析。
 - `DLC` 工具仅在用户点击后以原 EXE 直接启动，不经过 shell/BAT，也不自动附加参数。

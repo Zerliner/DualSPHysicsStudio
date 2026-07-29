@@ -8,6 +8,8 @@ import pytest
 from dualsphysics_studio.ui.models import (
     box_spec,
     build_scene_entries,
+    diagnostic_counts,
+    diagnostic_rows,
     diagnostics_to_text,
     normalize_category,
     parse_editor_value,
@@ -152,6 +154,15 @@ def test_diagnostics_format_severity_and_location() -> None:
     assert "[错误] marker 重复" in text
     assert "第 42 行" in text
     assert diagnostics_to_text([]) == "未发现需要注意的问题。"
+    rows = diagnostic_rows(diagnostics)
+    assert rows[0].severity == "warning"
+    assert rows[0].path == "/case/execution"
+    assert rows[1].line == 42
+    assert diagnostic_counts(diagnostics) == {
+        "error": 1,
+        "warning": 1,
+        "info": 0,
+    }
 
 
 def test_property_editor_conservative_type_conversion() -> None:
