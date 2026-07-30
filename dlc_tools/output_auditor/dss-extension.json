@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "name": "DSS 结果完整性审计器",
+  "version": "1.0.0",
+  "publisher": "DualSPHysics Studio",
+  "description": "只读扫描 Part/VTK/BI4 输出、缺帧、零字节文件和 Studio 运行阶段状态，并导出 JSON 报告。",
+  "executable": "DSSOutputAuditor.exe",
+  "license": "LICENSE",
+  "homepage": "https://github.com/Zerliner/DualSPHysicsStudio",
+  "supported_inputs": [
+    ".vtk",
+    ".vtu",
+    ".bi4",
+    ".json"
+  ]
+}

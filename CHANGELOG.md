@@ -2,6 +2,39 @@
 
 All notable changes to DualSPHysics Studio are documented in this file.
 
+## [1.0.3] - 2026-07-30
+
+### Added
+
+- Added source-hash and solver-backend-aware run comparison with one selected
+  baseline, all compatible case sessions, raw CSV export, and explicit reasons
+  when incompatible records are shown.
+- Added optional `dss-extension.json` schema 1 metadata for extension name,
+  version, publisher, executable, license, homepage, description, and supported
+  input extensions while preserving legacy EXE discovery.
+- Added the independently packaged DSS Output Auditor DLC. It performs bounded,
+  read-only file inventory, Part/VTK/BI4 frame-gap and zero-byte checks,
+  `.dss-run` stage inspection, and atomic JSON report export.
+- Added a packaged manifest example and DLC build workflow.
+- Added the Python/Tcl/Tk runtime license and acknowledgements to the
+  independently packaged auditor.
+
+### Changed
+
+- Extension menu entries now show provenance and require a trust confirmation
+  before the first launch in each Studio session.
+- Invalid manifests remain visible as disabled entries instead of silently
+  launching an EXE from the same directory.
+
+### Security
+
+- Manifest executable and license paths are resolved strictly inside the
+  manifest directory; absolute paths, traversal, missing files, unsupported
+  URLs, oversized metadata, and invalid input-extension declarations are
+  rejected.
+- The output auditor does not follow directory links, never edits source
+  results, and stops at a documented 250,000-file scan ceiling.
+
 ## [1.0.2] - 2026-07-29
 
 ### Added

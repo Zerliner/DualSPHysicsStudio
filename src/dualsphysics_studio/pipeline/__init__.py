@@ -7,6 +7,12 @@ from .base import (
     PipelineError,
     ToolNotFoundError,
 )
+from .compare import (
+    ComparisonColumn,
+    ComparisonRow,
+    RunComparison,
+    compare_sessions,
+)
 from .gencase import (
     GENCASE_CONFIG,
     GENCASE_EXECUTABLE,
@@ -50,6 +56,8 @@ from .session import (
 __all__ = [
     "Artifact",
     "ArtifactManifest",
+    "ComparisonColumn",
+    "ComparisonRow",
     "DUALSPHYSICS_CPU_EXECUTABLE",
     "DUALSPHYSICS_GPU_EXECUTABLE",
     "GENCASE_CONFIG",
@@ -63,6 +71,7 @@ __all__ = [
     "PARTVTK_VARIABLES",
     "PartVTKAdapter",
     "RunRequest",
+    "RunComparison",
     "RunResult",
     "RunSession",
     "ResourceEstimate",
@@ -73,6 +82,7 @@ __all__ = [
     "ToolNotFoundError",
     "DualSPHysicsCPUAdapter",
     "DualSPHysicsGPUAdapter",
+    "compare_sessions",
     "file_sha256",
     "find_case_sessions",
     "estimate_case",

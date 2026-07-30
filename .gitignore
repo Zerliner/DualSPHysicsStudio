@@ -29,3 +29,4 @@ Desktop.ini
 # Extensions are distributed separately; retain only the DLC instructions.
 /DLC/*
 !/DLC/README.txt
+!/DLC/dss-extension.example.json

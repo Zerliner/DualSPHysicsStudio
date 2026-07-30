@@ -1,5 +1,5 @@
 # -*- mode: python ; coding: utf-8 -*-
-"""PyInstaller onedir specification for DualSPHysics Studio 1.0.2.
+"""PyInstaller onedir specification for DualSPHysics Studio 1.0.3.
 
 Run this specification through ``packaging/build_portable.ps1``.  The spec
 deliberately packages only the Studio application and its Python runtime; it

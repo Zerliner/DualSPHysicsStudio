@@ -36,10 +36,15 @@ scope. Version labels are planning buckets, not delivery-date commitments.
    stage logs, tool hashes, interrupted-run recovery, and privacy-aware
    diagnostic exports. XML is included by default and can be explicitly
    excluded for private cases; local paths are always redacted from exports.
-7. Collect reproducible bug reports from the public releases.
-8. Exercise the portable build in CI or a controlled release workflow and add
+7. Completed in v1.0.3: add source-hash and backend-aware multi-run comparison,
+   relative deltas, incompatible-record explanations, and CSV export.
+8. Completed in v1.0.3: add optional manifest-based DLC provenance, first-launch
+   trust confirmation, legacy EXE compatibility, and an independently packaged
+   read-only output integrity auditor.
+9. Collect reproducible bug reports from the public releases.
+10. Exercise the portable build in CI or a controlled release workflow and add
    Authenticode signing when a publisher certificate is available.
-9. Keep Python and pinned dependencies current through reviewed, audited patch
+11. Keep Python and pinned dependencies current through reviewed, audited patch
    releases.
 
 Exit evidence: reproduced issues have regression tests; the complete Windows
@@ -63,7 +68,8 @@ change and has a focused fixture-based regression test.
 
 The base simulation workflow moved forward into v1.0.2.
 
-1. Compare estimates and actual measurements across multiple selected runs.
+1. Completed early in v1.0.3: compare actual measurements across a selected
+   baseline and multiple case sessions, with XML SHA and backend awareness.
 2. Add richer filtering and recovery guidance for interrupted or failed
    sessions while preserving the no-delete/no-overwrite rule.
 3. Add explicit capability diagnostics for configured DualSPHysics
@@ -93,12 +99,16 @@ coverage.
 This work can proceed alongside the version buckets without merging the
 independent OSGB-to-STL project into Studio.
 
-1. Document a minimal optional metadata manifest for tool name, version,
-   executable, license file, and supported inputs.
-2. Preserve legacy EXE discovery for the current portable suite.
-3. Show trust/source information before first launch and never auto-run a tool.
-4. Add compatibility tests using inert fake executables rather than shipping
-   third-party binaries.
+1. Completed in v1.0.3: document a minimal optional metadata manifest for tool
+   name, version, executable, license file, and supported inputs.
+2. Completed in v1.0.3: preserve legacy EXE discovery for the current portable
+   suite, including the independently distributed OSGB-to-STL tool.
+3. Completed in v1.0.3: show trust/source information before first launch and
+   never auto-run a tool.
+4. Completed in v1.0.3: add compatibility tests using inert fake executables
+   rather than shipping third-party binaries.
+5. Completed in v1.0.3: provide DSS Output Auditor as the first separately
+   packaged manifest-based DLC, with bounded read-only integrity checks.
 
 Exit evidence: the current OSGB-to-STL package remains auto-detected, legacy
 packages keep working, and manifest-based tools expose clearer provenance
@@ -106,6 +116,7 @@ without expanding their execution authority.
 
 ## Recommended next development ticket
 
-After validating the v1.0.2 portable package, add run-to-run comparison using
-the case-local session records. Keep comparisons source-hash and backend aware,
-and do not narrow resource ranges until representative evidence supports it.
+Add recovery guidance for interrupted and failed sessions, then expose
+capability diagnostics for the configured DualSPHysics installation. Preserve
+the no-delete/no-overwrite rule and do not narrow resource ranges until
+representative CPU and GPU evidence supports it.

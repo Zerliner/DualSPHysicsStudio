@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "name": "Example portable tool",
+  "version": "1.0.0",
+  "publisher": "Replace with publisher",
+  "description": "Replace with a concise description.",
+  "executable": "ExampleTool.exe",
+  "license": "LICENSE.txt",
+  "homepage": "https://example.com/tool",
+  "supported_inputs": [
+    ".stl",
+    ".vtk"
+  ]
+}

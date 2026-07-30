@@ -1,4 +1,4 @@
-# DualSPHysics Studio 1.0.2
+# DualSPHysics Studio 1.0.3
 
 面向 DualSPHysics v5.4 的 Windows XML 可视化编辑器与本地计算流程前端。
 
@@ -13,7 +13,9 @@ Copyright © 2026 Fang Li。项目采用 [MIT License](LICENSE) 发布。
 - 直接调用已有 `GenCase_win64.exe`、`DualSPHysics5.4CPU_win64.exe`、`DualSPHysics5.4_win64.exe` 和 `PartVTK_win64.exe`，依次生成初始模型、CPU/GPU 求解数据和粒子 VTK。
 - “一键完整运行”在强确认后依次执行 GenCase、用户明确选择的 CPU/GPU 求解和 PartVTK；运行中心持续显示阶段状态、粒子与资源区间、进度和动态 ETA。
 - 每个正式阶段都在输出目录的 `.dss-run` 中维护原子会话记录、XML 快照、脱敏日志、工具哈希和阶段清单；诊断 ZIP 默认包含 XML，也可因隐私需要显式排除。
-- “拓展功能”菜单按需发现便携目录 `DLC` 中由用户单独放入的独立 EXE，只有用户点击工具后才直接启动。
+- 运行记录对比以一个会话为基线，默认只比较相同 XML SHA 和相同 CPU/GPU 后端的历史记录，展示粒子、耗时、内存和帧数变化，并可导出 CSV。
+- “拓展功能”菜单保留 legacy EXE 自动发现，同时支持可选 `dss-extension.json` 元数据、目录逃逸防护、版本/发布者/许可展示和本次会话首次启动信任确认。
+- 独立 DLC“DSS 结果完整性审计器”只读检查 Part/VTK/BI4 文件清单、缺帧、零字节文件和 `.dss-run` 阶段状态，并单独打包分发。
 - 可选 OpenAI Responses API 中文解读；离线功能不需要密钥或网络。
 
 ## 从源码运行
@@ -37,12 +39,12 @@ python -m venv .venv
 
 若当前环境已安装 `requirements-lock.txt` 中的固定版本，可添加 `-SkipInstall`。构建脚本使用 PyInstaller `onedir`，只生成目录，不额外创建 ZIP：
 
-- `outputs\DualSPHysics Studio-v1.0.2 (windows x64)\`
+- `outputs\DualSPHysics Studio-v1.0.3 (windows x64)\`
 
 便携目录包含中文快速说明和合并后的第三方许可证，不包含 Python `*.dist-info` 安装元数据、DualSPHysics 官方二进制或任何案例文件。其基本结构为：
 
 ```text
-DualSPHysics Studio-v1.0.2 (windows x64)\
+DualSPHysics Studio-v1.0.3 (windows x64)\
   DualSPHysicsStudio.exe
   _internal\
   快速说明.md
@@ -50,11 +52,20 @@ DualSPHysics Studio-v1.0.2 (windows x64)\
   THIRD_PARTY_LICENSES.txt     # 第三方清单、声明和完整许可证原文
   DLC\                         # 默认拓展功能扫描目录
     README.txt
+    dss-extension.example.json
 ```
 
 `outputs` 被 Git 忽略，避免把数百 MB 的构建结果提交到源码历史。GitHub Release 不能直接上传目录；若将来需要一个可下载的二进制资产，应在发布流程中单独归档，而不是由本地构建脚本重复生成 ZIP。
 
-扩展工具不随 Studio 本体发布。单文件工具可直接放入 `DLC`；带 DLL、插件或许可文件的便携工具应完整放在 `DLC` 的一级子目录中。
+扩展工具不随 Studio 本体发布。单文件工具可直接放入 `DLC`；带 DLL、插件或许可文件的便携工具应完整放在 `DLC` 的一级子目录中。一级子目录可提供 `dss-extension.json` schema 1；无效 manifest 会显示为不可用，不会静默退回到同目录的 EXE。
+
+独立结果审计 DLC 使用同一 Python 3.13 x64 环境构建：
+
+```powershell
+.\dlc_tools\output_auditor\build_portable.ps1 -PythonExe C:\path\to\python.exe
+```
+
+输出位于 `outputs\DSS Output Auditor-v1.0.0 (windows x64)\`。将整个目录放入 Studio 的 `DLC`，不要只复制 EXE。
 
 ## 安全说明
 
@@ -63,7 +74,8 @@ DualSPHysics Studio-v1.0.2 (windows x64)\
 - STL/legacy VTK 在交给 VTK 读取器前执行有界预检；512 MiB、500 万点/单元或约 2 GiB 内存估算触发确认，4 GiB 或 2500 万点/单元触发硬阻断。
 - GenCase、CPU/GPU 求解器和 PartVTK 均以参数数组直接启动，不经过 BAT 或命令行 shell。
 - GenCase、CPU/GPU 求解器和 PartVTK 仅从已保存设置、`DUALSPHYSICS_ROOT` 或用户明确选择的目录解析。
-- `DLC` 工具仅在用户点击后以原 EXE 直接启动，不经过 shell/BAT，也不自动附加参数。
+- `DLC` 工具仅在用户点击并完成本次会话的首次信任确认后，以原 EXE 直接启动；不经过 shell/BAT，也不自动附加参数。
+- manifest 中的程序和许可路径必须保持在声明文件所在目录内；legacy EXE 仍兼容，但会明确显示未提供来源元数据。
 - 已存在求解数据或目标 VTK 时阻止运行，不自动删除或覆盖旧结果。
 - 资源估算明确区分定义域网格上限、GenCase 实测粒子数和求解器实测内存；数据不足时显示未知，不把启发式结果作为容量保证。
 - 诊断导出始终脱敏本机绝对路径；XML 默认随可复现记录导出，用户可在导出时勾选排除。

@@ -1062,6 +1062,62 @@ def test_run_center_exposes_full_flow_estimates_and_record_actions(
     qapp.processEvents()
 
 
+def test_run_comparison_enables_for_two_records_and_uses_current_baseline(
+    qapp: QApplication,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    window = _main_window_without_vtk(monkeypatch)
+    sessions = tuple(
+        SimpleNamespace(
+            status="succeeded",
+            backend="gpu",
+            created_at=f"2026-07-30T12:00:0{index}+00:00",
+            session_id=f"session-{index}",
+            record_path=tmp_path / f"out-{index}" / ".dss-run" / "run.json",
+        )
+        for index in range(2)
+    )
+    opened: list[tuple[tuple[object, ...], str, object]] = []
+
+    class FakeComparisonDialog:
+        def __init__(
+            self,
+            received_sessions,
+            *,
+            selected_record: str,
+            parent,
+        ) -> None:
+            opened.append((tuple(received_sessions), selected_record, parent))
+
+        def exec(self) -> int:
+            return 0
+
+    monkeypatch.setattr(
+        main_window_module,
+        "RunComparisonDialog",
+        FakeComparisonDialog,
+    )
+
+    window.set_run_history(sessions)
+
+    assert window.action_compare_runs.isEnabled()
+    assert window.compare_runs_button.isEnabled()
+    window.run_history_combo.setCurrentIndex(1)
+    window.action_compare_runs.trigger()
+    assert opened == [(sessions, str(sessions[1].record_path), window)]
+
+    window.set_run_state(True)
+    assert not window.action_compare_runs.isEnabled()
+    assert not window.compare_runs_button.isEnabled()
+    window.set_run_state(False)
+    assert window.action_compare_runs.isEnabled()
+    assert window.compare_runs_button.isEnabled()
+
+    delete(window)
+    qapp.processEvents()
+
+
 def test_full_run_dialog_requires_explicit_acknowledgement_and_keeps_partvtk(
     qapp: QApplication,
 ) -> None:
@@ -1110,18 +1166,33 @@ def test_extension_menu_refresh_discovers_only_root_and_one_level_tools(
     requested: list[str] = []
     window.extensionToolRequested.connect(requested.append)
     assert len(window._extension_actions) == 2
-    assert {Path(action.toolTip()).resolve() for action in window._extension_actions} == {
+    assert {Path(action.data()).resolve() for action in window._extension_actions} == {
         root_tool,
         child_tool,
     }
     assert deep_tool not in {
-        Path(action.toolTip()).resolve() for action in window._extension_actions
+        Path(action.data()).resolve() for action in window._extension_actions
     }
+    confirmations: list[str] = []
+    monkeypatch.setattr(
+        main_window_module.QMessageBox,
+        "question",
+        lambda _parent, _title, message, *_args: (
+            confirmations.append(message)
+            or main_window_module.QMessageBox.StandardButton.Yes
+        ),
+    )
 
     for action in window._extension_actions:
         action.trigger()
 
     assert {Path(path).resolve() for path in requested} == {root_tool, child_tool}
+    assert len(confirmations) == 2
+
+    for action in window._extension_actions:
+        action.trigger()
+    assert len(confirmations) == 2
+    assert len(requested) == 4
 
     delete(window)
     qapp.processEvents()
@@ -1196,7 +1267,7 @@ def test_scan_extension_action_switches_directory_and_refreshes_menu(
     assert dialog_calls[0][1] == str(current.resolve())
     assert window._extension_directory == selected.resolve()
     assert len(window._extension_actions) == 1
-    assert Path(window._extension_actions[0].toolTip()).resolve() == tool
+    assert Path(window._extension_actions[0].data()).resolve() == tool
     assert str(selected.resolve()) in window.status_message.text()
     assert window.extensions_menu.actions()[-1] is window.action_scan_extensions
     assert window.extensions_menu.actions()[-2].isSeparator()

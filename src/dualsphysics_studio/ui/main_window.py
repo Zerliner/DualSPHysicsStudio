@@ -40,6 +40,7 @@ from PySide6.QtWidgets import (
 
 from ..core.mesh_guard import MeshPreflightError, inspect_mesh_file
 from ..extensions import (
+    ExtensionTool,
     ExtensionToolError,
     default_dlc_directory,
     discover_extension_tools,
@@ -68,6 +69,7 @@ from .dialogs import (
 )
 from .viewport import VTK_AVAILABLE, VTKViewport
 from .xml_editor import XmlCodeEditor
+from .run_comparison import RunComparisonDialog
 
 
 PRODUCT_NAME = "DualSPHysics Studio"
@@ -151,8 +153,10 @@ class MainWindow(QMainWindow):
         self._diagnostic_detail_dialog: QDialog | None = None
         self._dirty = False
         self._run_active = False
+        self._run_sessions: tuple[Any, ...] = ()
         self._extension_directory = default_dlc_directory()
         self._extension_actions: list[QAction] = []
+        self._trusted_extensions: set[str] = set()
 
         self._source_timer = QTimer(self)
         self._source_timer.setSingleShot(True)
@@ -320,6 +324,9 @@ class MainWindow(QMainWindow):
         self.action_rerun_record = QAction("从记录创建新运行", self)
         self.action_rerun_record.setObjectName("action_rerun_record")
         self.action_rerun_record.setEnabled(False)
+        self.action_compare_runs = QAction("对比运行记录…", self)
+        self.action_compare_runs.setObjectName("action_compare_runs")
+        self.action_compare_runs.setEnabled(False)
         self.action_configure_dualsphysics = QAction("配置 DualSPHysics 路径…", self)
         self.action_configure_dualsphysics.setObjectName(
             "action_configure_dualsphysics"
@@ -383,6 +390,7 @@ class MainWindow(QMainWindow):
         run_menu.addAction(self.action_open_run_output)
         run_menu.addAction(self.action_export_run)
         run_menu.addAction(self.action_rerun_record)
+        run_menu.addAction(self.action_compare_runs)
 
         self.extensions_menu = self.menuBar().addMenu("拓展功能(&X)")
         self.extensions_menu.setObjectName("extensions_menu")
@@ -627,6 +635,10 @@ class MainWindow(QMainWindow):
         )
         self.rerun_record_button.setEnabled(False)
         record_buttons.addWidget(self.rerun_record_button)
+        self.compare_runs_button = QPushButton("对比记录…", self.run_overview_page)
+        self.compare_runs_button.setObjectName("compare_runs_button")
+        self.compare_runs_button.setEnabled(False)
+        record_buttons.addWidget(self.compare_runs_button)
         record_buttons.addStretch(1)
         overview_layout.addLayout(record_buttons)
 
@@ -905,9 +917,11 @@ class MainWindow(QMainWindow):
         self.action_rerun_record.triggered.connect(
             lambda _checked=False: self.rerunFromRecordRequested.emit()
         )
+        self.action_compare_runs.triggered.connect(self._show_run_comparison)
         self.open_run_output_button.clicked.connect(self.openRunOutputRequested.emit)
         self.export_run_button.clicked.connect(self.exportRunRequested.emit)
         self.rerun_record_button.clicked.connect(self.rerunFromRecordRequested.emit)
+        self.compare_runs_button.clicked.connect(self._show_run_comparison)
         self.run_history_combo.currentIndexChanged.connect(
             self._run_history_selection_changed
         )
@@ -2364,9 +2378,10 @@ class MainWindow(QMainWindow):
         self.update_run_stage(stage, "running", detail)
 
     def set_run_history(self, sessions: Any) -> None:
+        self._run_sessions = tuple(sessions)
         blocker = QSignalBlocker(self.run_history_combo)
         self.run_history_combo.clear()
-        for session in sessions:
+        for session in self._run_sessions:
             status = str(getattr(session, "status", "unknown"))
             backend = str(getattr(session, "backend", "")).upper()
             created = str(getattr(session, "created_at", ""))
@@ -2378,6 +2393,9 @@ class MainWindow(QMainWindow):
             )
         if self.run_history_combo.count() == 0:
             self.run_history_combo.addItem("暂无记录", "")
+        comparison_available = len(self._run_sessions) >= 2 and not self._run_active
+        self.action_compare_runs.setEnabled(comparison_available)
+        self.compare_runs_button.setEnabled(comparison_available)
         del blocker
 
     def set_run_record_available(self, available: bool) -> None:
@@ -2393,6 +2411,24 @@ class MainWindow(QMainWindow):
         if path:
             self.runSessionSelected.emit(path)
 
+    def _show_run_comparison(self) -> None:
+        if len(self._run_sessions) < 2:
+            QMessageBox.information(
+                self,
+                "运行记录不足",
+                "至少需要两条当前案例的运行记录才能进行对比。",
+            )
+            return
+        selected_record = str(
+            self.run_history_combo.currentData(Qt.ItemDataRole.UserRole) or ""
+        )
+        dialog = RunComparisonDialog(
+            self._run_sessions,
+            selected_record=selected_record,
+            parent=self,
+        )
+        dialog.exec()
+
     def set_run_state(self, running: bool, message: str | None = None) -> None:
         self._run_active = bool(running)
         run_enabled = not running and self._document is not None
@@ -2405,6 +2441,9 @@ class MainWindow(QMainWindow):
         self.action_partvtk.setEnabled(run_enabled)
         self.action_cancel.setEnabled(running)
         self.run_history_combo.setEnabled(not running)
+        comparison_available = len(self._run_sessions) >= 2 and not running
+        self.action_compare_runs.setEnabled(comparison_available)
+        self.compare_runs_button.setEnabled(comparison_available)
         record_available = self.action_export_run.isEnabled()
         self.action_rerun_record.setEnabled(record_available and not running)
         self.rerun_record_button.setEnabled(record_available and not running)
@@ -2662,12 +2701,15 @@ class MainWindow(QMainWindow):
                 empty.setToolTip(str(self._extension_directory))
                 self.extensions_menu.addAction(empty)
             for index, tool in enumerate(tools):
-                action = QAction(tool.label, self.extensions_menu)
+                label = tool.label if tool.available else f"不可用 · {tool.label}"
+                action = QAction(label, self.extensions_menu)
                 action.setObjectName(f"extension_tool_{index}")
-                action.setToolTip(str(tool.path))
+                action.setData(str(tool.path))
+                action.setToolTip(tool.detail_text())
+                action.setEnabled(tool.available)
                 action.triggered.connect(
-                    lambda _checked=False, path=str(tool.path): (
-                        self.extensionToolRequested.emit(path)
+                    lambda _checked=False, selected=tool: self._request_extension_tool(
+                        selected
                     )
                 )
                 self.extensions_menu.addAction(action)
@@ -2675,6 +2717,39 @@ class MainWindow(QMainWindow):
 
         self.extensions_menu.addSeparator()
         self.extensions_menu.addAction(self.action_scan_extensions)
+
+    def _request_extension_tool(self, tool: ExtensionTool) -> None:
+        if not tool.available:
+            return
+        try:
+            executable_stat = tool.path.stat()
+            manifest_stamp = ""
+            if tool.manifest_path is not None:
+                manifest_stat = tool.manifest_path.stat()
+                manifest_stamp = (
+                    f"|{manifest_stat.st_size}|{manifest_stat.st_mtime_ns}"
+                )
+            trust_key = (
+                f"{str(tool.path).casefold()}|{executable_stat.st_size}|"
+                f"{executable_stat.st_mtime_ns}{manifest_stamp}"
+            )
+        except OSError as error:
+            QMessageBox.critical(self, "扩展工具不可用", str(error))
+            return
+        if trust_key not in self._trusted_extensions:
+            answer = QMessageBox.question(
+                self,
+                "确认启动外部扩展程序",
+                f"{tool.detail_text()}\n\n"
+                "Studio 将直接启动该 EXE，不会通过 Shell，也不会自动传入当前案例。"
+                "外部程序拥有与当前用户相同的系统权限，请仅运行可信来源的软件。",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
+                QMessageBox.StandardButton.Cancel,
+            )
+            if answer != QMessageBox.StandardButton.Yes:
+                return
+            self._trusted_extensions.add(trust_key)
+        self.extensionToolRequested.emit(str(tool.path))
 
     def _scan_extension_directory(self) -> None:
         selected = QFileDialog.getExistingDirectory(

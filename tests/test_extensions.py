@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 import sys
 
@@ -73,6 +74,71 @@ def test_duplicate_executable_names_receive_unique_labels(tmp_path: Path) -> Non
     assert {tool.path.resolve() for tool in tools} == {first.resolve(), second.resolve()}
     assert len({tool.label.casefold() for tool in tools}) == 2
     assert all(tool.label.strip() for tool in tools)
+
+
+def test_manifest_describes_nested_executable_and_provenance(tmp_path: Path) -> None:
+    directory = tmp_path / "Output Auditor"
+    executable = _fake_executable(directory / "bin" / "DSSOutputAuditor.exe")
+    license_path = directory / "LICENSE.txt"
+    license_path.write_text("MIT", encoding="utf-8")
+    manifest = directory / "dss-extension.json"
+    manifest.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "name": "DSS Output Auditor",
+                "version": "1.0.0",
+                "publisher": "DualSPHysics Studio",
+                "description": "Read-only output integrity checks.",
+                "executable": "bin/DSSOutputAuditor.exe",
+                "license": "LICENSE.txt",
+                "homepage": "https://github.com/Zerliner/DualSPHysicsStudio",
+                "supported_inputs": [".vtk", ".BI4", ".vtk"],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    tools = discover_extension_tools(tmp_path)
+
+    assert len(tools) == 1
+    tool = tools[0]
+    assert tool.path == executable.resolve()
+    assert tool.label == "DSS Output Auditor"
+    assert tool.version == "1.0.0"
+    assert tool.publisher == "DualSPHysics Studio"
+    assert tool.license_path == license_path.resolve()
+    assert tool.supported_inputs == (".vtk", ".bi4")
+    assert tool.manifest_path == manifest.resolve()
+    assert tool.available
+    assert not tool.legacy
+    assert "Read-only output integrity checks." in tool.detail_text()
+
+
+def test_invalid_manifest_is_visible_but_cannot_fall_back_to_legacy(
+    tmp_path: Path,
+) -> None:
+    directory = tmp_path / "untrusted"
+    _fake_executable(directory / "Tool.exe")
+    (directory / "dss-extension.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "name": "Escaping Tool",
+                "executable": "../outside.exe",
+            }
+        ),
+        encoding="utf-8",
+    )
+    _fake_executable(tmp_path / "outside.exe")
+
+    tools = discover_extension_tools(tmp_path)
+
+    invalid = next(tool for tool in tools if tool.manifest_path is not None)
+    assert not invalid.available
+    assert "不能离开 manifest 目录" in invalid.error
+    assert all(tool.path.name != "Tool.exe" for tool in tools)
+    assert any(tool.path.name == "outside.exe" and tool.legacy for tool in tools)
 
 
 def test_launch_extension_uses_detached_program_argument_list_and_working_directory(
