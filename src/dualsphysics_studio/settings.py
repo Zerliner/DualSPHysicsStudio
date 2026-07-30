@@ -22,6 +22,7 @@ def cache_dir() -> Path:
 @dataclass(slots=True)
 class AppSettings:
     gencase_root: str = ""
+    last_solver_backend: str = "gpu"
     openai_model: str = "gpt-5.6-terra"
     recent_files: list[str] = field(default_factory=list)
     orthographic_view: bool = False
@@ -55,4 +56,3 @@ class AppSettings:
         self.recent_files = [item for item in self.recent_files if item != canonical]
         self.recent_files.insert(0, canonical)
         del self.recent_files[limit:]
-

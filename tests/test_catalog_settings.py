@@ -6,7 +6,7 @@ from dualsphysics_studio.version import APP_VERSION
 
 
 def test_product_version_is_1_0() -> None:
-    assert APP_VERSION == "1.0.1"
+    assert APP_VERSION == "1.0.2"
 
 
 def test_catalog_resolves_parameter_key() -> None:

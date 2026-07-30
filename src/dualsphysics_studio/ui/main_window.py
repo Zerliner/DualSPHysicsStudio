@@ -1,4 +1,4 @@
-"""Main PySide6 window for DualSPHysics Studio 1.0.1."""
+"""Main PySide6 window for DualSPHysics Studio."""
 
 from __future__ import annotations
 
@@ -109,7 +109,12 @@ class MainWindow(QMainWindow):
     cpuRequested = Signal()
     gpuRequested = Signal()
     partVTKRequested = Signal()
+    fullRunRequested = Signal()
     cancelRequested = Signal()
+    openRunOutputRequested = Signal()
+    exportRunRequested = Signal()
+    rerunFromRecordRequested = Signal()
+    runSessionSelected = Signal(str)
     configureDualSPHysicsRequested = Signal()
     aiPayloadPreviewRequested = Signal(str, str)
     aiExplainRequested = Signal(str, str)
@@ -283,6 +288,14 @@ class MainWindow(QMainWindow):
         self.action_generate.setObjectName("action_generate")
         self.action_generate.setToolTip("运行 GenCase 并生成 Case.xml、Case.bi4 和初始 VTK")
 
+        self.action_full_run = QAction(
+            style.standardIcon(QStyle.StandardPixmap.SP_MediaPlay), "一键完整运行", self
+        )
+        self.action_full_run.setObjectName("action_full_run")
+        self.action_full_run.setToolTip(
+            "依次执行 GenCase、明确选择的 CPU/GPU 求解和 PartVTK 转换"
+        )
+
         self.action_cancel = QAction(
             style.standardIcon(QStyle.StandardPixmap.SP_MediaStop), "取消运行", self
         )
@@ -298,6 +311,15 @@ class MainWindow(QMainWindow):
         self.action_partvtk = QAction("PartVTK 转换", self)
         self.action_partvtk.setObjectName("action_partvtk")
         self.action_partvtk.setToolTip("将 data 中的粒子 BI4 数据转换为 PartAll VTK")
+        self.action_open_run_output = QAction("打开运行输出目录", self)
+        self.action_open_run_output.setObjectName("action_open_run_output")
+        self.action_open_run_output.setEnabled(False)
+        self.action_export_run = QAction("导出可复现记录…", self)
+        self.action_export_run.setObjectName("action_export_run")
+        self.action_export_run.setEnabled(False)
+        self.action_rerun_record = QAction("从记录创建新运行", self)
+        self.action_rerun_record.setObjectName("action_rerun_record")
+        self.action_rerun_record.setEnabled(False)
         self.action_configure_dualsphysics = QAction("配置 DualSPHysics 路径…", self)
         self.action_configure_dualsphysics.setObjectName(
             "action_configure_dualsphysics"
@@ -349,6 +371,7 @@ class MainWindow(QMainWindow):
         run_menu = self.menuBar().addMenu("运行(&R)")
         run_menu.addAction(self.action_configure_dualsphysics)
         run_menu.addSeparator()
+        run_menu.addAction(self.action_full_run)
         run_menu.addAction(self.action_quick_check)
         run_menu.addAction(self.action_generate)
         run_menu.addAction(self.action_cancel)
@@ -356,6 +379,10 @@ class MainWindow(QMainWindow):
         run_menu.addAction(self.action_cpu)
         run_menu.addAction(self.action_gpu)
         run_menu.addAction(self.action_partvtk)
+        run_menu.addSeparator()
+        run_menu.addAction(self.action_open_run_output)
+        run_menu.addAction(self.action_export_run)
+        run_menu.addAction(self.action_rerun_record)
 
         self.extensions_menu = self.menuBar().addMenu("拓展功能(&X)")
         self.extensions_menu.setObjectName("extensions_menu")
@@ -378,6 +405,7 @@ class MainWindow(QMainWindow):
         run_toolbar = QToolBar("运行", self)
         run_toolbar.setObjectName("run_toolbar")
         run_toolbar.setMovable(False)
+        run_toolbar.addAction(self.action_full_run)
         run_toolbar.addAction(self.action_quick_check)
         run_toolbar.addAction(self.action_generate)
         run_toolbar.addAction(self.action_cpu)
@@ -469,7 +497,7 @@ class MainWindow(QMainWindow):
         self._create_source_tab()
         self._create_log_tab()
         self.bottom_tabs.addTab(self.source_tab, "XML 源码")
-        self.bottom_tabs.addTab(self.log_tab, "运行日志")
+        self.bottom_tabs.addTab(self.log_tab, "运行中心")
 
         self.center_splitter.addWidget(viewport_group)
         self.center_splitter.addWidget(self.bottom_tabs)
@@ -519,13 +547,103 @@ class MainWindow(QMainWindow):
         run_bar.addWidget(self.run_progress)
         layout.addLayout(run_bar)
 
-        self.log_view = QPlainTextEdit(self.log_tab)
+        self.run_center_tabs = QTabWidget(self.log_tab)
+        self.run_center_tabs.setObjectName("run_center_tabs")
+
+        self.run_overview_page = QWidget(self.run_center_tabs)
+        overview_layout = QVBoxLayout(self.run_overview_page)
+        overview_layout.setContentsMargins(4, 4, 4, 4)
+        session_row = QHBoxLayout()
+        self.run_session_label = QLabel("会话：尚未创建", self.run_overview_page)
+        self.run_session_label.setObjectName("run_session_label")
+        session_row.addWidget(self.run_session_label)
+        session_row.addStretch(1)
+        session_row.addWidget(QLabel("历史记录", self.run_overview_page))
+        self.run_history_combo = QComboBox(self.run_overview_page)
+        self.run_history_combo.setObjectName("run_history_combo")
+        self.run_history_combo.setMinimumWidth(260)
+        self.run_history_combo.addItem("暂无记录", "")
+        session_row.addWidget(self.run_history_combo)
+        overview_layout.addLayout(session_row)
+
+        self.run_stage_table = QTableWidget(4, 3, self.run_overview_page)
+        self.run_stage_table.setObjectName("run_stage_table")
+        self.run_stage_table.setHorizontalHeaderLabels(["阶段", "状态", "详情"])
+        self.run_stage_table.verticalHeader().setVisible(False)
+        self.run_stage_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.run_stage_table.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
+        self.run_stage_table.horizontalHeader().setSectionResizeMode(
+            0, QHeaderView.ResizeMode.ResizeToContents
+        )
+        self.run_stage_table.horizontalHeader().setSectionResizeMode(
+            1, QHeaderView.ResizeMode.ResizeToContents
+        )
+        self.run_stage_table.horizontalHeader().setStretchLastSection(True)
+        self.run_stage_table.setMaximumHeight(150)
+        for row, (stage, label) in enumerate(
+            (
+                ("preflight", "资源预检"),
+                ("gencase", "GenCase"),
+                ("solver", "CPU/GPU 求解"),
+                ("partvtk", "PartVTK"),
+            )
+        ):
+            item = QTableWidgetItem(label)
+            item.setData(Qt.ItemDataRole.UserRole, stage)
+            self.run_stage_table.setItem(row, 0, item)
+            self.run_stage_table.setItem(row, 1, QTableWidgetItem("等待"))
+            self.run_stage_table.setItem(row, 2, QTableWidgetItem(""))
+        overview_layout.addWidget(self.run_stage_table)
+
+        self.resource_table = QTableWidget(0, 4, self.run_overview_page)
+        self.resource_table.setObjectName("resource_estimate_table")
+        self.resource_table.setHorizontalHeaderLabels(
+            ["资源项目", "估算/实测", "置信度", "依据"]
+        )
+        self.resource_table.verticalHeader().setVisible(False)
+        self.resource_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.resource_table.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
+        self.resource_table.horizontalHeader().setSectionResizeMode(
+            0, QHeaderView.ResizeMode.ResizeToContents
+        )
+        self.resource_table.horizontalHeader().setSectionResizeMode(
+            1, QHeaderView.ResizeMode.ResizeToContents
+        )
+        self.resource_table.horizontalHeader().setSectionResizeMode(
+            2, QHeaderView.ResizeMode.ResizeToContents
+        )
+        self.resource_table.horizontalHeader().setStretchLastSection(True)
+        overview_layout.addWidget(self.resource_table, 1)
+
+        record_buttons = QHBoxLayout()
+        self.open_run_output_button = QPushButton("打开输出目录", self.run_overview_page)
+        self.open_run_output_button.setEnabled(False)
+        record_buttons.addWidget(self.open_run_output_button)
+        self.export_run_button = QPushButton("导出记录…", self.run_overview_page)
+        self.export_run_button.setEnabled(False)
+        record_buttons.addWidget(self.export_run_button)
+        self.rerun_record_button = QPushButton(
+            "从记录创建新运行", self.run_overview_page
+        )
+        self.rerun_record_button.setEnabled(False)
+        record_buttons.addWidget(self.rerun_record_button)
+        record_buttons.addStretch(1)
+        overview_layout.addLayout(record_buttons)
+
+        self.run_log_page = QWidget(self.run_center_tabs)
+        log_layout = QVBoxLayout(self.run_log_page)
+        log_layout.setContentsMargins(4, 4, 4, 4)
+        self.log_view = QPlainTextEdit(self.run_log_page)
         self.log_view.setObjectName("log_view")
         self.log_view.setReadOnly(True)
         self.log_view.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
         self.log_view.setFont(QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont))
         self.log_view.setPlaceholderText("运行工具的标准输出、错误和产物摘要将在这里显示。")
-        layout.addWidget(self.log_view, 1)
+        log_layout.addWidget(self.log_view, 1)
+
+        self.run_center_tabs.addTab(self.run_overview_page, "会话概览")
+        self.run_center_tabs.addTab(self.run_log_page, "实时日志")
+        layout.addWidget(self.run_center_tabs, 1)
 
     def _create_inspector_panel(self) -> None:
         self.inspector_tabs = QTabWidget(self)
@@ -772,11 +890,27 @@ class MainWindow(QMainWindow):
             lambda _checked=False: self.configureDualSPHysicsRequested.emit()
         )
         self.action_quick_check.triggered.connect(self._request_quick_check)
+        self.action_full_run.triggered.connect(self._request_full_run)
         self.action_generate.triggered.connect(self._request_generate)
         self.action_cpu.triggered.connect(self._request_cpu)
         self.action_gpu.triggered.connect(self._request_gpu)
         self.action_partvtk.triggered.connect(self._request_partvtk)
         self.action_cancel.triggered.connect(lambda _checked=False: self.cancelRequested.emit())
+        self.action_open_run_output.triggered.connect(
+            lambda _checked=False: self.openRunOutputRequested.emit()
+        )
+        self.action_export_run.triggered.connect(
+            lambda _checked=False: self.exportRunRequested.emit()
+        )
+        self.action_rerun_record.triggered.connect(
+            lambda _checked=False: self.rerunFromRecordRequested.emit()
+        )
+        self.open_run_output_button.clicked.connect(self.openRunOutputRequested.emit)
+        self.export_run_button.clicked.connect(self.exportRunRequested.emit)
+        self.rerun_record_button.clicked.connect(self.rerunFromRecordRequested.emit)
+        self.run_history_combo.currentIndexChanged.connect(
+            self._run_history_selection_changed
+        )
         self.action_about.triggered.connect(self._show_about)
 
         self.model_tree.currentItemChanged.connect(self._tree_selection_changed)
@@ -2109,6 +2243,14 @@ class MainWindow(QMainWindow):
             return False
 
     # --------------------------------------------------------------- pipeline UI
+    def _request_full_run(self) -> None:
+        if self._document is None:
+            self.status_message.setText("请先打开 XML")
+            return
+        if not self._flush_source_edit(strict=True):
+            return
+        self.fullRunRequested.emit()
+
     def _request_quick_check(self) -> None:
         if self._document is None:
             self.status_message.setText("请先打开 XML")
@@ -2154,16 +2296,118 @@ class MainWindow(QMainWindow):
         self.set_run_state(True, "正在执行 PartVTK 转换…")
         self.partVTKRequested.emit()
 
+    def begin_run_session(self, session_id: str, backend: str) -> None:
+        self.run_session_label.setText(
+            f"会话：{session_id}　后端：{backend.upper()}"
+        )
+        for row in range(self.run_stage_table.rowCount()):
+            self.run_stage_table.item(row, 1).setText("等待")
+            self.run_stage_table.item(row, 2).setText("")
+        self.update_run_stage("preflight", "succeeded", "资源估算已完成")
+        self.run_center_tabs.setCurrentWidget(self.run_overview_page)
+
+    def update_run_stage(self, stage: str, status: str, detail: str = "") -> None:
+        stage_key = "solver" if stage in {"cpu", "gpu"} else stage
+        labels = {
+            "pending": "等待",
+            "running": "运行中",
+            "succeeded": "成功",
+            "failed": "失败",
+            "cancelled": "已取消",
+            "skipped": "已跳过",
+            "interrupted": "已中断",
+        }
+        for row in range(self.run_stage_table.rowCount()):
+            item = self.run_stage_table.item(row, 0)
+            if item.data(Qt.ItemDataRole.UserRole) != stage_key:
+                continue
+            self.run_stage_table.item(row, 1).setText(
+                labels.get(status, status)
+            )
+            self.run_stage_table.item(row, 2).setText(detail)
+            break
+
+    def update_resource_estimate(self, estimate: Any) -> None:
+        rows = getattr(estimate, "metric_rows", lambda: ())()
+        self.resource_table.setRowCount(len(rows))
+        for row, values in enumerate(rows):
+            for column, value in enumerate(values):
+                self.resource_table.setItem(
+                    row, column, QTableWidgetItem(str(value))
+                )
+
+    def update_stage_progress(
+        self,
+        stage: str,
+        completed: int,
+        total: int,
+        *,
+        eta_seconds: float | None = None,
+    ) -> None:
+        if total <= 0:
+            return
+        percent = max(0, min(100, round(completed * 100 / total)))
+        self.run_progress.setRange(0, 100)
+        self.run_progress.setValue(percent)
+        detail = f"{completed}/{total}（{percent}%）"
+        if eta_seconds is not None:
+            eta = max(0, int(round(eta_seconds)))
+            hours, remainder = divmod(eta, 3600)
+            minutes, seconds = divmod(remainder, 60)
+            if hours:
+                eta_text = f"{hours} 小时 {minutes} 分"
+            elif minutes:
+                eta_text = f"{minutes} 分 {seconds} 秒"
+            else:
+                eta_text = f"{seconds} 秒"
+            detail += f"　预计剩余 {eta_text}"
+        self.update_run_stage(stage, "running", detail)
+
+    def set_run_history(self, sessions: Any) -> None:
+        blocker = QSignalBlocker(self.run_history_combo)
+        self.run_history_combo.clear()
+        for session in sessions:
+            status = str(getattr(session, "status", "unknown"))
+            backend = str(getattr(session, "backend", "")).upper()
+            created = str(getattr(session, "created_at", ""))
+            session_id = str(getattr(session, "session_id", ""))
+            record_path = str(getattr(session, "record_path", ""))
+            self.run_history_combo.addItem(
+                f"{created[:19]}　{backend}　{status}　{session_id[-8:]}",
+                record_path,
+            )
+        if self.run_history_combo.count() == 0:
+            self.run_history_combo.addItem("暂无记录", "")
+        del blocker
+
+    def set_run_record_available(self, available: bool) -> None:
+        self.action_open_run_output.setEnabled(available)
+        self.action_export_run.setEnabled(available)
+        self.action_rerun_record.setEnabled(available and not self._run_active)
+        self.open_run_output_button.setEnabled(available)
+        self.export_run_button.setEnabled(available)
+        self.rerun_record_button.setEnabled(available and not self._run_active)
+
+    def _run_history_selection_changed(self, index: int) -> None:
+        path = str(self.run_history_combo.itemData(index) or "")
+        if path:
+            self.runSessionSelected.emit(path)
+
     def set_run_state(self, running: bool, message: str | None = None) -> None:
         self._run_active = bool(running)
         run_enabled = not running and self._document is not None
         self.action_configure_dualsphysics.setEnabled(not running)
+        self.action_full_run.setEnabled(run_enabled)
         self.action_quick_check.setEnabled(run_enabled)
         self.action_generate.setEnabled(run_enabled)
         self.action_cpu.setEnabled(run_enabled)
         self.action_gpu.setEnabled(run_enabled)
         self.action_partvtk.setEnabled(run_enabled)
         self.action_cancel.setEnabled(running)
+        self.run_history_combo.setEnabled(not running)
+        record_available = self.action_export_run.isEnabled()
+        self.action_rerun_record.setEnabled(record_available and not running)
+        self.rerun_record_button.setEnabled(record_available and not running)
         self.action_new_box.setEnabled(not running and self._document is not None)
         self.action_new_prism.setEnabled(not running and self._document is not None)
         self._set_geometry_actions_enabled(
@@ -2176,6 +2420,7 @@ class MainWindow(QMainWindow):
         if running:
             self.run_progress.setRange(0, 0)
             self.bottom_tabs.setCurrentWidget(self.log_tab)
+            self.run_center_tabs.setCurrentWidget(self.run_log_page)
         else:
             self.run_progress.setRange(0, 100)
             self.run_progress.setValue(100 if message and "成功" in message else 0)
@@ -2195,7 +2440,13 @@ class MainWindow(QMainWindow):
         self.log_view.setTextCursor(cursor)
         self.log_view.ensureCursorVisible()
 
-    def finish_run(self, result: Any, *, stage: str | None = None) -> None:
+    def finish_run(
+        self,
+        result: Any,
+        *,
+        stage: str | None = None,
+        workflow_continues: bool = False,
+    ) -> None:
         success = bool(value_of(result, "success", default=False))
         status = value_of(result, "status", default="")
         if str(status).lower() in {"success", "succeeded", "complete", "completed"}:
@@ -2212,7 +2463,13 @@ class MainWindow(QMainWindow):
         message = str(value_of(result, "message", default="")).strip()
         if not message and str(status).lower() == "cancelled":
             message = f"{stage_label}已取消"
-        self.set_run_state(False, message or f"{stage_label}{'成功完成' if success else '运行失败'}")
+        if workflow_continues and success:
+            self.set_run_state(True, message or f"{stage_label}成功，准备下一阶段…")
+        else:
+            self.set_run_state(
+                False,
+                message or f"{stage_label}{'成功完成' if success else '运行失败'}",
+            )
         log = value_of(result, "stdout", default="")
         if log:
             self.append_log(str(log))
@@ -2496,6 +2753,7 @@ class MainWindow(QMainWindow):
         )
         self.action_save.setEnabled(False)
         self.action_save_as.setEnabled(False)
+        self.action_full_run.setEnabled(False)
         self.action_quick_check.setEnabled(False)
         self.action_generate.setEnabled(False)
         self.action_cpu.setEnabled(False)
@@ -2515,6 +2773,7 @@ class MainWindow(QMainWindow):
             enabled and self._selected_entry is not None and self._selected_entry.editable
         )
         if not self._run_active:
+            self.action_full_run.setEnabled(enabled)
             self.action_quick_check.setEnabled(enabled)
             self.action_generate.setEnabled(enabled)
             self.action_cpu.setEnabled(enabled)

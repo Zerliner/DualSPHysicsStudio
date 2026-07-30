@@ -27,13 +27,19 @@ scope. Version labels are planning buckets, not delivery-date commitments.
    bridge to the GenCase quick check.
 3. Completed in v1.0.1: expose an initial searchable parameter workbench for
    existing scalar values while retaining XML as the only source of truth.
-4. Collect reproducible bug reports from the public releases.
-5. Add an opt-in diagnostic export containing version, stage logs, and
-   non-sensitive environment facts while excluding case content, credentials,
-   and personal paths by default.
-6. Exercise the portable build in CI or a controlled release workflow and add
+4. Completed in v1.0.2: add conservative resource estimates that distinguish
+   definition-domain upper bounds, GenCase particle measurements, solver
+   memory reports, history-calibrated duration, and unavailable data.
+5. Completed in v1.0.2: add a run center and an explicitly confirmed complete
+   GenCase -> CPU/GPU -> PartVTK workflow while preserving direct stage actions.
+6. Completed in v1.0.2: add case-local atomic run records, XML snapshots,
+   stage logs, tool hashes, interrupted-run recovery, and privacy-aware
+   diagnostic exports. XML is included by default and can be explicitly
+   excluded for private cases; local paths are always redacted from exports.
+7. Collect reproducible bug reports from the public releases.
+8. Exercise the portable build in CI or a controlled release workflow and add
    Authenticode signing when a publisher certificate is available.
-7. Keep Python and pinned dependencies current through reviewed, audited patch
+9. Keep Python and pinned dependencies current through reviewed, audited patch
    releases.
 
 Exit evidence: reproduced issues have regression tests; the complete Windows
@@ -53,20 +59,20 @@ remain clean.
 Exit evidence: every supported edit round-trips losslessly outside the intended
 change and has a focused fixture-based regression test.
 
-## v1.2 — simulation workflow
+## v1.2 — run insight and recovery
 
-1. Make GenCase, CPU/GPU solver, and PartVTK stages easier to inspect through
-   structured command previews, progress, duration, and result summaries.
-2. Add a case-local run history that records hashes and stage outcomes without
-   storing private paths in the repository or release package.
-3. Improve recovery guidance for interrupted, failed, or conflicting stages
-   while preserving the no-delete/no-overwrite rule.
-4. Add explicit capability and version diagnostics for configured
-   DualSPHysics installations.
+The base simulation workflow moved forward into v1.0.2.
 
-Exit evidence: a generic sample case can complete the configured stage sequence
-with reviewable manifests, deterministic conflict behavior, and tested failure
-recovery.
+1. Compare estimates and actual measurements across multiple selected runs.
+2. Add richer filtering and recovery guidance for interrupted or failed
+   sessions while preserving the no-delete/no-overwrite rule.
+3. Add explicit capability diagnostics for configured DualSPHysics
+   installations and solver options.
+4. Validate history calibration on documented representative CPU and GPU
+   cases before narrowing any resource range.
+
+Exit evidence: comparisons remain source-hash and backend aware, recovery always
+creates a new safe run, and representative cases document estimate error bands.
 
 ## v1.3 — results visualization
 
@@ -100,7 +106,6 @@ without expanding their execution authority.
 
 ## Recommended next development ticket
 
-After validating the v1.0.1 portable package, implement the opt-in,
-privacy-filtered diagnostic export. It gives public bug reports a reproducible
-source of truth without collecting case XML, credentials, or personal paths by
-default.
+After validating the v1.0.2 portable package, add run-to-run comparison using
+the case-local session records. Keep comparisons source-hash and backend aware,
+and do not narrow resource ranges until representative evidence supports it.
