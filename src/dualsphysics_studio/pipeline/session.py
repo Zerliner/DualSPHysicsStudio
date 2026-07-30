@@ -462,19 +462,27 @@ def _relative_or_name(path: Path, root: Path) -> str:
 
 class _Redactor:
     def __init__(self, paths: Iterable[str | os.PathLike[str]]) -> None:
-        resolved: list[str] = []
-        for item in paths:
+        replacements: list[tuple[str, int]] = []
+        seen: set[str] = set()
+        for index, item in enumerate(paths, start=1):
             raw = str(Path(item))
-            resolved.append(raw)
+            aliases = [raw]
             try:
-                resolved.append(str(Path(item).resolve()))
+                aliases.append(str(Path(item).resolve()))
             except OSError:
                 pass
-        self.paths = tuple(sorted(set(resolved), key=len, reverse=True))
+            for alias in aliases:
+                if alias in seen:
+                    continue
+                seen.add(alias)
+                replacements.append((alias, index))
+        self.replacements = tuple(
+            sorted(replacements, key=lambda item: len(item[0]), reverse=True)
+        )
 
     def text(self, value: str) -> str:
         result = value
-        for index, path in enumerate(self.paths, start=1):
+        for path, index in self.replacements:
             result = result.replace(path, f"<LOCAL_PATH_{index}>")
             result = result.replace(path.replace("\\", "/"), f"<LOCAL_PATH_{index}>")
         result = re.sub(
