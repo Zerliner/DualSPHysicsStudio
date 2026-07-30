@@ -464,10 +464,12 @@ class _Redactor:
     def __init__(self, paths: Iterable[str | os.PathLike[str]]) -> None:
         resolved: list[str] = []
         for item in paths:
+            raw = str(Path(item))
+            resolved.append(raw)
             try:
                 resolved.append(str(Path(item).resolve()))
             except OSError:
-                resolved.append(str(item))
+                pass
         self.paths = tuple(sorted(set(resolved), key=len, reverse=True))
 
     def text(self, value: str) -> str:

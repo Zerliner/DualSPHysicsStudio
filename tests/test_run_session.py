@@ -149,7 +149,10 @@ class RunSessionTests(unittest.TestCase):
                 },
             )
 
-            self.assertEqual(session.record_path, output / ".dss-run" / "run.json")
+            self.assertEqual(
+                session.record_path,
+                output.resolve() / ".dss-run" / "run.json",
+            )
             self.assertEqual(session.source_snapshot.read_text(encoding="utf-8"), "<case/>")
             payload = json.loads(session.record_path.read_text(encoding="utf-8"))
             self.assertNotIn(str(root), json.dumps(payload))
