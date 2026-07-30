@@ -17,7 +17,9 @@ from shiboken6 import delete
 import dualsphysics_studio.ui.dialogs as dialogs_module
 import dualsphysics_studio.ui.main_window as main_window_module
 import dualsphysics_studio.ui.viewport as viewport_module
+import dualsphysics_studio.app as app_module
 from dualsphysics_studio.core import CaseDocument
+from dualsphysics_studio.pipeline import ResourceEstimate
 from dualsphysics_studio.ui.viewport import VTK_AVAILABLE, VTKViewport
 
 if VTK_AVAILABLE:
@@ -999,6 +1001,92 @@ def test_run_menu_exposes_dualsphysics_path_configuration(
     assert emitted == [True]
 
     delete(window)
+    qapp.processEvents()
+
+
+def test_run_center_exposes_full_flow_estimates_and_record_actions(
+    qapp: QApplication, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fixture = Path(__file__).parent / "fixtures" / "sample_case.xml"
+    document = CaseDocument.from_file(fixture)
+    window = _main_window_without_vtk(monkeypatch)
+    window.set_document(document, fixture)
+
+    emitted: list[bool] = []
+    window.fullRunRequested.connect(lambda: emitted.append(True))
+    window.action_full_run.trigger()
+    qapp.processEvents()
+    assert emitted == [True]
+
+    estimate = ResourceEstimate(
+        phase="preflight",
+        confidence="low",
+        domain_grid_particles=1234,
+        output_frames=31,
+    )
+    window.begin_run_session("session-1234", "gpu")
+    window.update_resource_estimate(estimate)
+    window.update_run_stage("gpu", "running", "3/31")
+    assert "session-1234" in window.run_session_label.text()
+    assert window.resource_table.rowCount() >= 2
+    solver_row = next(
+        row
+        for row in range(window.run_stage_table.rowCount())
+        if window.run_stage_table.item(row, 0).data(Qt.ItemDataRole.UserRole)
+        == "solver"
+    )
+    assert window.run_stage_table.item(solver_row, 1).text() == "运行中"
+    assert window.run_stage_table.item(solver_row, 2).text() == "3/31"
+
+    session = SimpleNamespace(
+        status="succeeded",
+        backend="gpu",
+        created_at="2026-07-29T12:00:00+00:00",
+        session_id="session-1234",
+        record_path=fixture.parent / "run.json",
+    )
+    window.set_run_history((session,))
+    assert window.run_history_combo.count() == 1
+    window.set_run_record_available(True)
+    assert window.action_export_run.isEnabled()
+    assert window.export_run_button.isEnabled()
+
+    window.set_run_state(True, "运行中")
+    assert not window.action_full_run.isEnabled()
+    assert not window.run_history_combo.isEnabled()
+    window.set_run_state(False, "成功完成")
+    assert window.action_full_run.isEnabled()
+    assert window.run_history_combo.isEnabled()
+
+    delete(window)
+    qapp.processEvents()
+
+
+def test_full_run_dialog_requires_explicit_acknowledgement_and_keeps_partvtk(
+    qapp: QApplication,
+) -> None:
+    parent = main_window_module.MainWindow()
+    estimate = ResourceEstimate("preflight", "low")
+    dialog = app_module._FullRunDialog(
+        parent,
+        default_backend="cpu",
+        estimate=estimate,
+    )
+
+    assert dialog.backend == "cpu"
+    assert not dialog.start_button.isEnabled()
+    assert "PartVTK" in dialog.confirm_check.text()
+    dialog.confirm_check.setChecked(True)
+    assert dialog.start_button.isEnabled()
+
+    privacy = app_module._DiagnosticExportDialog(parent)
+    assert privacy.include_xml
+    privacy.exclude_xml_check.setChecked(True)
+    assert not privacy.include_xml
+
+    delete(privacy)
+    delete(dialog)
+    delete(parent)
     qapp.processEvents()
 
 

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "dualsphysics-studio"
-version = "1.0.1"
+version = "1.0.2"
 description = "DualSPHysics v5.4 XML visual editor and local pipeline frontend"
 readme = "README.md"
 license = "MIT"

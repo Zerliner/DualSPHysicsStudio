@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
 
 import dualsphysics_studio.app as app_module
 from dualsphysics_studio.ai.models import (
@@ -10,7 +11,7 @@ from dualsphysics_studio.ai.models import (
     RiskItem,
 )
 from dualsphysics_studio.app import StudioController, format_ai_result
-from dualsphysics_studio.pipeline import ToolInfo
+from dualsphysics_studio.pipeline import RunResult, RunSession, ToolInfo
 from dualsphysics_studio.resources import resource_path
 
 
@@ -194,3 +195,111 @@ def test_configure_dualsphysics_rejects_incomplete_or_wrong_version_root(
     assert controller.settings.gencase_root == ""
     assert controller.settings.save_count == 0
     assert "[失败] PartVTK" in errors[-1]
+
+
+class _FakeRunWindow:
+    def __init__(self, source: Path) -> None:
+        self.document_path = source
+        self.document = object()
+        self.finished: list[tuple[str | None, bool]] = []
+        self.stages: list[tuple[str, str, str]] = []
+        self.logs: list[tuple[str, str]] = []
+        self.record_available = False
+
+    def finish_run(
+        self,
+        _result,
+        *,
+        stage=None,
+        workflow_continues=False,
+    ) -> None:
+        self.finished.append((stage, workflow_continues))
+
+    def update_run_stage(self, stage: str, status: str, detail: str = "") -> None:
+        self.stages.append((stage, status, detail))
+
+    def update_resource_estimate(self, _estimate) -> None:
+        pass
+
+    def append_log(self, text: str, *, stream: str = "stdout") -> None:
+        self.logs.append((stream, text))
+
+    def set_run_record_available(self, available: bool) -> None:
+        self.record_available = available
+
+
+def _run_result(
+    source: Path,
+    output_prefix: Path,
+    stage: str,
+    *,
+    status: str = "succeeded",
+) -> RunResult:
+    result = RunResult(
+        status=status,
+        return_code=0 if status == "succeeded" else 1,
+        command=(stage,),
+        working_directory=source.parent,
+        output_prefix=output_prefix,
+        started_at="2026-07-29T00:00:00+00:00",
+        finished_at="2026-07-29T00:00:01+00:00",
+        summary={},
+        cancelled=status == "cancelled",
+    )
+    result.manifest = SimpleNamespace(
+        stage=stage,
+        parameters={"mode": "full" if stage == "gencase" else stage},
+        source_path=source,
+    )
+    return result
+
+
+def test_full_run_state_machine_always_reaches_partvtk(tmp_path) -> None:
+    source = tmp_path / "Case_Def.xml"
+    source.write_text("<case/>", encoding="utf-8")
+    output_prefix = tmp_path / "Case_out" / "Case"
+    session = RunSession.create(
+        source_xml=source,
+        output_root=output_prefix.parent,
+        backend="gpu",
+        workflow=("gencase", "gpu", "partvtk"),
+    )
+    controller = StudioController.__new__(StudioController)
+    controller.window = _FakeRunWindow(source)
+    controller._run_session = session
+    controller._selected_session = session
+    controller._full_run_active = True
+    controller._full_run_backend = "gpu"
+    controller._pending_full_stage = None
+    controller._active_stage = "gencase"
+    controller._last_run = None
+    controller._last_gencase_run = None
+    controller._case_output_prefix = output_prefix
+    controller._case_output_source = source
+    controller._gencase_summary = {}
+    estimates: list[dict] = []
+    controller._refresh_session_estimate = lambda summary: estimates.append(summary)
+
+    controller._run_finished(_run_result(source, output_prefix, "gencase"))
+    assert controller._pending_full_stage == "gpu"
+    assert controller.window.finished[-1] == ("gencase", True)
+
+    controller._active_stage = "gpu"
+    controller._pending_full_stage = None
+    controller._run_finished(_run_result(source, output_prefix, "gpu"))
+    assert controller._pending_full_stage == "partvtk"
+    assert controller.window.finished[-1] == ("gpu", True)
+
+    controller._active_stage = "partvtk"
+    controller._pending_full_stage = None
+    controller._run_finished(_run_result(source, output_prefix, "partvtk"))
+    assert not controller._full_run_active
+    assert controller._pending_full_stage is None
+    assert controller.window.finished[-1] == ("partvtk", False)
+    assert session.status == "succeeded"
+    assert [session.stages[stage]["status"] for stage in session.workflow] == [
+        "succeeded",
+        "succeeded",
+        "succeeded",
+    ]
+    assert len(estimates) == 2

@@ -2,6 +2,40 @@
 
 All notable changes to DualSPHysics Studio are documented in this file.
 
+## [1.0.2] - 2026-07-29
+
+### Added
+
+- Added conservative preflight resource estimates from `dp`, definition
+  bounds, `TimeMax`, and `TimeOut`, followed by GenCase particle-count
+  correction and measured solver-memory parsing.
+- Added a run center with session history, stage status, determinate particle
+  frame progress, dynamic ETA, resource evidence, output access, and record
+  export actions.
+- Added an explicitly confirmed one-click workflow that always executes
+  GenCase, the user-selected CPU or GPU solver, and PartVTK in order.
+- Added case-local `.dss-run` records with atomic `run.json` updates, the exact
+  XML snapshot, stage logs, tool and configuration hashes, relative manifest
+  references, interrupted-run recovery, and checksum-bearing diagnostic ZIPs.
+- Added “create a new run from record”; it repeats preflight into a new output
+  directory and never replays an old command over existing outputs.
+
+### Changed
+
+- Manual GenCase, CPU/GPU, and PartVTK actions now join or create the same
+  reproducible output session used by the one-click workflow.
+- Diagnostic exports include the XML snapshot by default. Users with case
+  privacy requirements can explicitly exclude it in the export dialog.
+
+### Security
+
+- Diagnostic exports redact local absolute paths from records, manifests, and
+  logs while continuing to exclude credentials and arbitrary environment
+  variables.
+- Heuristic capacity estimates never silently select a solver, overwrite an
+  output, or claim guaranteed capacity; hard execution failures still come
+  from validated inputs, trusted tools, and observed output conflicts.
+
 ## [1.0.1] - 2026-07-29
 
 ### Added

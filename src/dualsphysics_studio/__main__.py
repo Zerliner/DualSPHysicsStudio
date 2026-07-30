@@ -24,6 +24,8 @@ def _smoke_test() -> int:
         DualSPHysicsGPUAdapter,
         GenCaseAdapter,
         PartVTKAdapter,
+        RunSession,
+        estimate_case,
     )
     from .resources import resource_path
     from openai import OpenAI
@@ -44,6 +46,21 @@ def _smoke_test() -> int:
     PartVTKAdapter()
     with tempfile.TemporaryDirectory(prefix="dss-smoke-") as temporary:
         temporary_path = Path(temporary)
+        source_path = temporary_path / "Case_Def.xml"
+        source_path.write_text(document.text, encoding="utf-8")
+        session = RunSession.create(
+            source_xml=source_path,
+            output_root=temporary_path / "Case_out",
+            backend="gpu",
+            workflow=("gencase", "gpu", "partvtk"),
+        )
+        session.add_estimate(estimate_case(document))
+        diagnostic_path = session.export_diagnostic(
+            temporary_path / "diagnostic.zip"
+        )
+        if not session.record_path.is_file() or not diagnostic_path.is_file():
+            raise RuntimeError("run-session smoke test failed")
+
         stl_path = temporary_path / "triangle.stl"
         stl_path.write_text(
             "solid test\n"

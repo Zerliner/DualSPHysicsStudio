@@ -1,4 +1,4 @@
-"""Public core API for DualSPHysics Studio 1.0.1."""
+"""Public core API for DualSPHysics Studio."""
 
 from .document import CaseDocument
 from .errors import (

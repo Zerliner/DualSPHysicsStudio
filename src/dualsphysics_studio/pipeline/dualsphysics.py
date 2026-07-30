@@ -113,6 +113,34 @@ def _parse_gpu_report(text: str) -> tuple[dict[str, object], list[str]]:
         device_match = re.match(r"^Device default:\s*(.+)$", line)
         if device_match is not None:
             summary["device"] = device_match.group(1).strip()
+        particle_match = re.match(r"^CaseNp\s*=\s*([\d,]+)", line, re.IGNORECASE)
+        if particle_match is not None:
+            summary["particles"] = int(particle_match.group(1).replace(",", ""))
+        requested_memory = re.search(
+            r"Requested\s+gpu\s+memory\s+for\s+[\d,]+\s+particles:\s*"
+            r"([0-9.,]+)\s*(B|KB|MB|GB)\b",
+            line,
+            re.IGNORECASE,
+        )
+        if requested_memory is not None:
+            summary["requested_gpu_memory_bytes"] = _memory_bytes(
+                requested_memory.group(1), requested_memory.group(2)
+            )
+        allocated_memory = re.match(
+            r"^Allocated\s+memory\s+in\s+(CPU|GPU):\s*([\d,]+)"
+            r"(?:\s*\(\s*([0-9.,]+)\s*(B|KB|MB|GB)\s*\))?",
+            line,
+            re.IGNORECASE,
+        )
+        if allocated_memory is not None:
+            raw_bytes = int(allocated_memory.group(2).replace(",", ""))
+            value = (
+                _memory_bytes(allocated_memory.group(3), allocated_memory.group(4))
+                if allocated_memory.group(3) and allocated_memory.group(4)
+                else raw_bytes
+            )
+            key = f"allocated_{allocated_memory.group(1).casefold()}_memory_bytes"
+            summary[key] = value
         for key, pattern in patterns:
             match = re.match(pattern, line, re.IGNORECASE)
             if match is None:
@@ -121,6 +149,17 @@ def _parse_gpu_report(text: str) -> tuple[dict[str, object], list[str]]:
             summary[key] = float(value) if key.endswith("_seconds") else int(value)
             break
     return summary, warnings
+
+
+def _memory_bytes(value: str, unit: str) -> int:
+    number = float(value.replace(",", ""))
+    factor = {
+        "b": 1,
+        "kb": 1024,
+        "mb": 1024 * 1024,
+        "gb": 1024 * 1024 * 1024,
+    }[unit.casefold()]
+    return int(round(number * factor))
 
 
 class _DualSPHysicsExecutableAdapter(PipelineAdapter):

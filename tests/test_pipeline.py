@@ -222,6 +222,10 @@ class FakePipelineProcess:
                 "DualSPHysics5 v5.4.355\n"
                 f"{device}"
                 "*** WARNING: Test warning.\n"
+                "CaseNp=1,000\n"
+                "**Requested gpu memory for 1,000 particles: 64.0 MB.\n"
+                "Allocated memory in CPU: 33554432 (32.0 MB)\n"
+                "Allocated memory in GPU: 67108864 (64.0 MB)\n"
                 "Total Runtime....................: 2.5 sec.\n"
                 "Simulation Runtime...............: 2.0 sec.\n"
                 "Steps of simulation..............: 1,234\n"
@@ -695,6 +699,10 @@ class PipelineTests(unittest.TestCase):
             self.assertEqual(result.summary["device"], '0 "Test GPU"')
             self.assertEqual(result.summary["steps"], 1_234)
             self.assertEqual(result.summary["total_runtime_seconds"], 2.5)
+            self.assertEqual(result.summary["particles"], 1_000)
+            self.assertEqual(result.summary["allocated_cpu_memory_bytes"], 32 * 1024 * 1024)
+            self.assertEqual(result.summary["allocated_gpu_memory_bytes"], 64 * 1024 * 1024)
+            self.assertEqual(result.summary["requested_gpu_memory_bytes"], 64 * 1024 * 1024)
             self.assertIn("Test warning.", result.warnings)
             self.assertEqual(result.manifest.stage, "gpu")
             self.assertTrue(result.manifest_path.name.endswith(".gpu.manifest.json"))

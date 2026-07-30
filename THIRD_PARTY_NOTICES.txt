@@ -1,5 +1,5 @@
 THIRD-PARTY SOFTWARE NOTICES
-DualSPHysics Studio 1.0.1
+DualSPHysics Studio 1.0.2
 
 Copyright (c) 2026 Fang Li. The original DualSPHysics Studio source code is
 licensed under the MIT License in the separate `LICENSE` file.
