@@ -2644,13 +2644,13 @@ class MainWindow(QMainWindow):
         if report.requires_confirmation:
             answer = QMessageBox.question(
                 self,
-                "大型模型资源警告",
+                "模型预检提醒",
                 f"{path.name}\n\n{report.summary()}\n\n仍要加载本次模型吗？",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
                 QMessageBox.StandardButton.Cancel,
             )
             if answer != QMessageBox.StandardButton.Yes:
-                self.status_message.setText("已取消大型模型加载")
+                self.status_message.setText("已取消模型加载")
                 return False
             allow_large = True
         loader = (
@@ -2665,7 +2665,15 @@ class MainWindow(QMainWindow):
     def _vtk_loaded(self, path: str) -> None:
         stats = self.viewport.last_mesh_stats
         suffix = f" · {stats.points:,} 点" if stats is not None else ""
-        self.status_message.setText(f"已加载权威 VTK：{Path(path).name}{suffix}")
+        report = self.viewport.last_mesh_report
+        quality = (
+            f" · {report.quality.short_status()}"
+            if report is not None and report.quality is not None
+            else ""
+        )
+        self.status_message.setText(
+            f"已加载权威 VTK：{Path(path).name}{suffix}{quality}"
+        )
 
     def _vtk_failed(self, path: str, error: str) -> None:
         self._report_error("VTK 加载失败", f"{Path(path).name}\n\n{error}")
@@ -2677,8 +2685,15 @@ class MainWindow(QMainWindow):
             if stats is not None
             else ""
         )
+        report = self.viewport.last_mesh_report
+        quality = (
+            f" · Mesh Doctor：{report.quality.short_status()}"
+            if report is not None and report.quality is not None
+            else ""
+        )
         self.status_message.setText(
-            f"已加载 STL 表面模型（保留原始坐标与尺度）：{Path(path).name}{suffix}"
+            "已加载 STL 表面模型（保留原始坐标与尺度）："
+            f"{Path(path).name}{suffix}{quality}"
         )
 
     def _stl_failed(self, path: str, error: str) -> None:

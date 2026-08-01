@@ -83,6 +83,12 @@ def _smoke_test() -> int:
             raise RuntimeError("STL reader smoke test failed")
         if stl_report.estimated_cells != 1:
             raise RuntimeError("STL resource preflight smoke test failed")
+        if (
+            stl_report.quality is None
+            or not stl_report.quality.analyzed
+            or stl_report.quality.boundary_edges != 3
+        ):
+            raise RuntimeError("Mesh Doctor preflight smoke test failed")
 
         vtk_path = temporary_path / "triangle.vtk"
         vtk_path.write_text(

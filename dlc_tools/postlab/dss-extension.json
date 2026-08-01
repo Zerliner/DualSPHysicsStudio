@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "name": "DSS PostLab",
+  "version": "1.0.0",
+  "publisher": "DualSPHysics Studio",
+  "description": "发现用户已有的官方后处理工具，以参数数组执行可审计配方，并始终创建全新输出任务目录。",
+  "executable": "DSSPostLab.exe",
+  "license": "LICENSE",
+  "homepage": "https://github.com/Zerliner/DualSPHysicsStudio",
+  "supported_inputs": [
+    ".bi4",
+    ".ibi4",
+    ".xml",
+    ".json"
+  ]
+}

@@ -15,6 +15,19 @@ All notable changes to DualSPHysics Studio are documented in this file.
 - Added the independently packaged DSS Output Auditor DLC. It performs bounded,
   read-only file inventory, Part/VTK/BI4 frame-gap and zero-byte checks,
   `.dss-run` stage inspection, and atomic JSON report export.
+- Added Mesh Doctor to Studio's existing STL/legacy VTK preflight. Within a
+  documented budget it reports STL boundary and non-manifold edges, duplicate
+  and degenerate faces, orientation, normals, connected components, area,
+  bounds, watertightness, and enclosed volume.
+- Added the independently packaged DSS Mesh Doctor DLC, which uses the same
+  preflight core as Studio and exports atomic JSON reports.
+- Added the independently packaged DSS PostLab DLC for discovering nine known
+  official post-processors, previewing and running path-free argument-array
+  recipes without a shell, and recording tool hashes, logs, status, and output
+  inventories in a unique task directory.
+- Added the independently packaged DSS Validation Lab DLC for source-hashed CSV
+  alignment, linear interpolation on the reference time grid, common error and
+  peak metrics, data-quality warnings, and JSON/CSV/offline-HTML report bundles.
 - Added a packaged manifest example and DLC build workflow.
 - Added the Python/Tcl/Tk runtime license and acknowledgements to the
   independently packaged auditor.
@@ -25,6 +38,9 @@ All notable changes to DualSPHysics Studio are documented in this file.
   before the first launch in each Studio session.
 - Invalid manifests remain visible as disabled entries instead of silently
   launching an EXE from the same directory.
+- The 3D-load confirmation now covers high-risk Mesh Doctor findings as well as
+  resource budgets. An open STL surface alone remains informational because
+  terrain and sheet boundaries can be intentionally open.
 
 ### Security
 
@@ -34,6 +50,13 @@ All notable changes to DualSPHysics Studio are documented in this file.
   rejected.
 - The output auditor does not follow directory links, never edits source
   results, and stops at a documented 250,000-file scan ceiling.
+- Mesh Doctor topology work is capped at 256 MiB and 100,000 triangles.
+- PostLab rejects absolute/traversal recipe paths, requires output placement in
+  a new task directory, and invokes only fixed official executable names under
+  the selected `bin/windows` directory.
+- Validation Lab caps CSV size and row count, rejects duplicate transformed
+  timestamps, does not extrapolate, and omits source absolute paths from its
+  portable report metadata.
 
 ## [1.0.2] - 2026-07-29
 

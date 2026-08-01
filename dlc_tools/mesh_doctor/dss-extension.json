@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "name": "DSS Mesh Doctor",
+  "version": "1.0.0",
+  "publisher": "DualSPHysics Studio",
+  "description": "独立执行 Studio 同源的 STL/legacy VTK 资源预检和 STL 拓扑质量诊断，并导出 JSON 报告。",
+  "executable": "DSSMeshDoctor.exe",
+  "license": "LICENSE",
+  "homepage": "https://github.com/Zerliner/DualSPHysicsStudio",
+  "supported_inputs": [
+    ".stl",
+    ".vtk"
+  ]
+}

@@ -41,10 +41,16 @@ scope. Version labels are planning buckets, not delivery-date commitments.
 8. Completed in v1.0.3: add optional manifest-based DLC provenance, first-launch
    trust confirmation, legacy EXE compatibility, and an independently packaged
    read-only output integrity auditor.
-9. Collect reproducible bug reports from the public releases.
-10. Exercise the portable build in CI or a controlled release workflow and add
+9. Completed in v1.0.3: extend the existing mesh resource preflight with a
+   budgeted STL topology Mesh Doctor and provide the same checks as an
+   independent DLC.
+10. Completed in v1.0.3: provide first-batch PostLab and Validation Lab DLCs
+    with auditable post-processing recipes and source-traceable CSV comparison
+    bundles.
+11. Collect reproducible bug reports from the public releases.
+12. Exercise the portable build in CI or a controlled release workflow and add
    Authenticode signing when a publisher certificate is available.
-11. Keep Python and pinned dependencies current through reviewed, audited patch
+13. Keep Python and pinned dependencies current through reviewed, audited patch
    releases.
 
 Exit evidence: reproduced issues have regression tests; the complete Windows
@@ -109,6 +115,9 @@ independent OSGB-to-STL project into Studio.
    rather than shipping third-party binaries.
 5. Completed in v1.0.3: provide DSS Output Auditor as the first separately
    packaged manifest-based DLC, with bounded read-only integrity checks.
+6. Completed in v1.0.3: provide DSS Mesh Doctor, DSS PostLab, and DSS Validation
+   Lab as independently packaged manifest-based DLCs; Mesh Doctor shares its
+   diagnostic core with Studio's built-in preflight.
 
 Exit evidence: the current OSGB-to-STL package remains auto-detected, legacy
 packages keep working, and manifest-based tools expose clearer provenance
