@@ -6,7 +6,7 @@
   "description": "对齐实测/参考 CSV 与仿真 CSV，计算可复核误差指标，并导出 JSON、CSV 和离线 HTML 报告。",
   "executable": "DSSValidationLab.exe",
   "license": "LICENSE",
-  "homepage": "https://github.com/Zerliner/DualSPHysicsStudio",
+  "homepage": "https://github.com/Zerliner/DSS-Validation-Lab",
   "supported_inputs": [
     ".csv"
   ]

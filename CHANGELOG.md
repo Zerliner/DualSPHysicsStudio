@@ -2,7 +2,7 @@
 
 All notable changes to DualSPHysics Studio are documented in this file.
 
-## [1.0.3] - 2026-07-30
+## [1.0.3] - 2026-08-02
 
 ### Added
 

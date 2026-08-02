@@ -1,7 +1,21 @@
 # DSS Validation Lab
 
-DSS Validation Lab 是独立的仿真验证 DLC，用于把参考/实测 CSV 与
-DualSPHysics 后处理结果 CSV 对齐，并输出可追溯的验证资料。
+> **项目定位：DSS Validation Lab 首先作为 [DualSPHysics Studio](https://github.com/Zerliner/DualSPHysicsStudio) 的仿真验证 DLC 开发，同时也可作为独立 Windows 便携工具使用。**
+
+DSS Validation Lab 用于把参考/实测 CSV 与 DualSPHysics 后处理结果 CSV
+对齐，并输出可追溯的验证资料。
+
+## 使用方式
+
+- **作为 Studio DLC：**把解压后的完整
+  `DSS Validation Lab-v1.0.0 (windows x64)` 目录放入 DualSPHysics Studio
+  的 `DLC` 目录。Studio 会读取 `dss-extension.json` 自动识别并在“拓展功能”
+  菜单显示该工具。
+- **独立使用：**保持便携目录完整，直接运行 `DSSValidationLab.exe`；不要求
+  安装 DualSPHysics Studio。
+
+不要只复制 EXE；README、许可文件和 `dss-extension.json` 应与 EXE 保持在
+同一便携目录中。
 
 ## 主要能力
 
@@ -22,3 +36,13 @@ CSV 支持 UTF-8、GB18030 和 CP1252，文件上限为 256 MiB、数据行上�
 
 `LICENSE` 适用于本工具自有源码；
 `THIRD_PARTY_LICENSES.txt` 保留便携运行时许可。
+
+## 从源码构建
+
+在 Windows PowerShell 中使用 Python 3.13 x64：
+
+```powershell
+.\dlc_tools\validation_lab\build_portable.ps1 -PythonExe C:\path\to\python.exe
+```
+
+构建结果写入 `outputs\DSS Validation Lab-v1.0.0 (windows x64)`。

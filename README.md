@@ -17,8 +17,8 @@ Copyright © 2026 Fang Li。项目采用 [MIT License](LICENSE) 发布。
 - “拓展功能”菜单保留 legacy EXE 自动发现，同时支持可选 `dss-extension.json` 元数据、目录逃逸防护、版本/发布者/许可展示和本次会话首次启动信任确认。
 - 独立 DLC“DSS 结果完整性审计器”只读检查 Part/VTK/BI4 文件清单、缺帧、零字节文件和 `.dss-run` 阶段状态，并单独打包分发。
 - 独立 DLC“DSS Mesh Doctor”复用 Studio 的同一预检核心，可单独检查 STL/legacy VTK 并导出 JSON。
-- 独立 DLC“DSS PostLab”发现用户已有的九种官方后处理工具，以无 Shell 的参数数组执行可审计配方，并始终写入新的任务目录。
-- 独立 DLC“DSS Validation Lab”对齐参考/实测与仿真 CSV，输出误差指标、数据质量警告、对齐 CSV、JSON 和离线 HTML 报告。
+- 独立 DLC“[DSS PostLab](https://github.com/Zerliner/DSS-PostLab)”发现用户已有的九种官方后处理工具，以无 Shell 的参数数组执行可审计配方，并始终写入新的任务目录；既可由 Studio 的拓展功能菜单启动，也可独立使用。
+- 独立 DLC“[DSS Validation Lab](https://github.com/Zerliner/DSS-Validation-Lab)”对齐参考/实测与仿真 CSV，输出误差指标、数据质量警告、对齐 CSV、JSON 和离线 HTML 报告；既可由 Studio 的拓展功能菜单启动，也可独立使用。
 - 可选 OpenAI Responses API 中文解读；离线功能不需要密钥或网络。
 
 ## 从源码运行

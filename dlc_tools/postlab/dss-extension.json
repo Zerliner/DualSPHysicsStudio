@@ -6,7 +6,7 @@
   "description": "发现用户已有的官方后处理工具，以参数数组执行可审计配方，并始终创建全新输出任务目录。",
   "executable": "DSSPostLab.exe",
   "license": "LICENSE",
-  "homepage": "https://github.com/Zerliner/DualSPHysicsStudio",
+  "homepage": "https://github.com/Zerliner/DSS-PostLab",
   "supported_inputs": [
     ".bi4",
     ".ibi4",

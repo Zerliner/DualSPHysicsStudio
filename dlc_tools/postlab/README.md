@@ -1,7 +1,20 @@
 # DSS PostLab
 
-DSS PostLab 是独立后处理配方中心。它不包含 DualSPHysics 官方二进制，
-只发现并直接调用用户已有的 v5.4 Windows 工具。
+> **项目定位：DSS PostLab 首先作为 [DualSPHysics Studio](https://github.com/Zerliner/DualSPHysicsStudio) 的后处理 DLC 开发，同时也可作为独立 Windows 便携工具使用。**
+
+DSS PostLab 是后处理配方中心。它不包含 DualSPHysics 官方二进制，只发现并
+直接调用用户已有的 v5.4 Windows 工具。
+
+## 使用方式
+
+- **作为 Studio DLC：**把解压后的完整 `DSS PostLab-v1.0.0 (windows x64)`
+  目录放入 DualSPHysics Studio 的 `DLC` 目录。Studio 会读取
+  `dss-extension.json` 自动识别并在“拓展功能”菜单显示该工具。
+- **独立使用：**保持便携目录完整，直接运行 `DSSPostLab.exe`；不要求安装
+  DualSPHysics Studio。
+
+不要只复制 EXE；README、许可文件和 `dss-extension.json` 应与 EXE 保持在
+同一便携目录中。
 
 ## 支持发现
 
@@ -29,3 +42,13 @@ DSS PostLab 是独立后处理配方中心。它不包含 DualSPHysics 官方二
 
 `LICENSE` 适用于 PostLab 自有源码；`THIRD_PARTY_LICENSES.txt` 保留便携
 Python/Tcl/Tk 运行时许可。
+
+## 从源码构建
+
+在 Windows PowerShell 中使用 Python 3.13 x64：
+
+```powershell
+.\dlc_tools\postlab\build_portable.ps1 -PythonExe C:\path\to\python.exe
+```
+
+构建结果写入 `outputs\DSS PostLab-v1.0.0 (windows x64)`。
